@@ -1,0 +1,440 @@
+---
+title: "XRD Code 1: data bkg fitting and wavelength tranformation"
+output: 
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: united
+    df_print: paged
+date: "2023-06-16"
+Author: Bryan Rodriguez Colon
+Description: X-Ray Difracction data Processing - Puerto Rico
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
+
+```
+
+
+```{r load packages, include=F, ECHO =F}
+library(powdR)
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(baseline)
+library(EEM)
+library(data.table)
+library(tidyverse)
+library(conflicted)
+library(stringr)
+library(signal)
+
+```
+
+
+# Functions
+
+## Custom Functions to deal errors in data
+
+MultiXYShiftC2 is Custom function to fix the alignment error with C2 cores (S8389). Instead of using the alignment equation I will subtract the off values by 0.2. Thanks to Nat Coombs for the help on this section. This function was made for C2 data with 8389 steps. 
+```{r Load MultiXYShift function}
+
+MultiXYShift <-function(mXY, thresh, corrTth){
+  C_DF<-vector(mode = "list", length = length(mXY))
+  for(i in 1:length(mXY)){
+    C_DF[[i]] <- as.data.frame(mXY[i])
+    if(C_DF[[i]][1,1] >= thresh){
+      C_DF[[i]][,1] <- corrTth
+    }
+  }
+  names(C_DF) <- names(mXY)
+
+  return(as_multi_xy(C_DF))
+}
+```
+
+
+## Function to substract background noise in XRD
+
+The background_subtract function is designed to remove the background signal from a list of XRD spectra. Each element in the input list is assumed to be a data frame containing two columns: tth (the 2θ values) and counts (the intensity values). For each spectrum, the function uses the bkg() function to estimate the background. It then subtracts this estimated background from the original counts to yield a background‐corrected spectrum. Finally, it returns all background-subtracted spectra as a multi_xy list, which is compatible with further processing using the powdR package.
+
+Key Points:
+
+Input: A list of data frames, each with columns tth and counts.
+Processing:
+Background is estimated using bkg().
+The background is subtracted from the original counts.
+Output: A named multi_xy list (via as_multi_xy) for use in subsequent analyses.
+
+```{r Function to substract Background}
+background_subtract <- function(data_frame_list) {
+  # Create an empty list to store the background-subtracted data frames
+  background_subtracted_list <- list()
+
+ # Loop through each data frame in the list
+  for (i in 1:length(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    
+    # Fit a background to the current data frame
+    bkg_result <- bkg(data_frame_list[[i]])
+    
+    # Calculate background subtracted count intensities
+    bkg_subtracted_counts <- bkg_result$counts - bkg_result$background
+    
+    # Create a new data frame with background subtracted data
+    bkg_subtracted_df <- data.frame("tth" = bkg_result$tth, "counts" = bkg_subtracted_counts)
+    
+    # Store the new data frame with its original name in the list
+    background_subtracted_list[[original_name]] <- bkg_subtracted_df
+  }
+  
+  # Return the named list of background-subtracted data frames
+  return(as_multi_xy(background_subtracted_list)) #Always put it back to the multi_xy_list format for powdR
+}
+```
+
+
+## Functions to smooth XRD Spectra
+### savgol_smooth function
+
+The function below, savgol_smooth, is designed to apply Savitzky–Golay smoothing to a list of XRD spectra. Each element in the list is a data frame (or multi_xy list) with two columns: tth (the 2θ values) and counts (the intensity). The function loops through each spectrum and applies the Savitzky–Golay filter—using the sgolayfilt function from the signal package—with user-defined parameters for the window size and polynomial order.
+
+Window (n): This is the number of data points used for the smoothing window and must be an odd number. Increasing the window size produces a smoother curve but may reduce the resolution of sharp peaks.
+Polynomial Order (p): This parameter sets the order of the polynomial fitted within each window. A higher order better preserves the shape of the peaks, although too high a value may start to follow the noise.
+The function then creates a new data frame for each spectrum with the original tth values and the smoothed counts, and returns the results as a multi_xy list (compatible with the powdR package). This function works similarly to your existing background_subtract function, but focuses on noise reduction while preserving peak shapes.
+
+```{r Function savgol_smooth}
+savgol_smooth <- function(data_frame_list, window = 13, polyorder = 3) {
+  # Create an empty list to store the smoothed data frames
+  smoothed_list <- list()
+  
+  # Loop through each data frame in the list
+  for (i in seq_along(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    df <- data_frame_list[[i]]
+    
+    # Apply Savitzky-Golay filter from the signal package to smooth the counts
+    smoothed_counts <- sgolayfilt(df$counts, p = polyorder, n = window)
+    
+    # Create a new data frame with the original tth and the smoothed counts
+    smoothed_df <- data.frame(tth = df$tth, counts = smoothed_counts)
+    
+    # Store the new data frame in the list, retaining the original name
+    smoothed_list[[original_name]] <- smoothed_df
+  }
+  
+  # Return the list in the multi_xy format (assuming you're using powdR)
+  return(as_multi_xy(smoothed_list))
+}
+
+```
+
+### moving_average_smooth Function
+
+The moving_average_smooth function applies a moving average filter to a list of XRD spectra. Each element in the input list should be a data frame containing the columns tth (2θ values) and counts (intensity). The function loops over each spectrum, computes the moving average over a specified window (default is 5 points), and creates a new data frame with the original tth values and the smoothed intensity values. The result is returned as a multi_xy list (compatible with the powdR package) for further processing. Adjust the window parameter to control the degree of smoothing.
+
+```{r moving_average_smooth function}
+moving_average_smooth <- function(data_frame_list, window = 5) {
+  # Create an empty list to store the smoothed data frames
+  smoothed_list <- list()
+  
+  # Loop through each data frame in the list
+  for (i in seq_along(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    df <- data_frame_list[[i]]
+    
+    # Apply the moving average filter using stats::filter
+    # rep(1/window, window) creates the averaging window (equal weights)
+    smoothed_counts <- stats::filter(df$counts, rep(1/window, window), sides = 2)
+    
+    # Create a new data frame with the original tth and the smoothed counts.
+    # Convert the filtered result to numeric in case it's a time series object.
+    smoothed_df <- data.frame(tth = df$tth, counts = as.numeric(smoothed_counts))
+    
+    # Store the new data frame in the list, retaining the original name
+    smoothed_list[[original_name]] <- smoothed_df
+  }
+  
+  # Return the list in the multi_xy_list format for powdR
+  return(as_multi_xy(smoothed_list))
+}
+
+```
+
+
+
+
+
+# Load and Process Data
+
+
+```{r To reset data without erasing functions}
+rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
+```
+
+
+```{r Load data, ECHO=F, include=FALSE}
+
+####Data for core C2
+C2 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/C2_S8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+C2 <- extract_xy(C2)
+
+#Fix the 2theta data from C2 (steps 8389) using the function MultiXYShiftC2.
+C2 <- MultiXYShift(C2, 5.2, C2$d102cm$tth)
+
+#Data from C2 at 54 cm (its in a different one because it was ran at 2797 steps, not 8389)
+#d54cm <- system.file("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/C2_S2797", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+#d54cm <- extract_xy(d54cm)
+
+
+
+####Data for core C3
+C3 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/C3", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+C3 <- extract_xy(C3)
+
+
+
+####Data from Ponce Limestone (James)
+PL <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PonceLimestone", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PL <- extract_xy(PL)
+
+
+####Data from microbialites (from 2019)
+PS19 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PS19", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PS19 <- extract_xy(PS19)
+
+####Data from microbialites (2022 and 2023)
+
+PS2223 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PS2223/", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PS2223 <- extract_xy(PS2223)
+
+
+####Data POE1 microbial mats samples (2019)
+POE <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/POE_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+POE <- extract_xy(POE)
+
+####Data from JB
+JB <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/JB_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+JB <- extract_xy(JB)
+
+
+####Data from POC
+POC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/POC_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+POC <- extract_xy(POC)
+
+
+
+#### Icacos microbialite Sample
+IC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Icacos", recursive = T, pattern = "\\.txt$", full.names = T)
+IC <- extract_xy(IC)
+
+
+#### Aliyahs PO samples
+AliyahPO <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Aliyah_PO_Data/", recursive = T, pattern = "\\.txt$", full.names = T)
+AliyahPO <- extract_xy(AliyahPO)
+
+
+
+print("All Samples loaded")
+
+```
+
+## Wavelength transformation (From Co to Cu)
+
+Change from Co to Cu wavelength in all Data samples by using the tth_transform function from the powdR package
+
+```{r Co -> Cu trasnformation}
+
+####Sediment Cores
+#C2
+C2 <- multi_xy_to_df(C2)
+C2$tth <- tth_transform(C2$tth, from = 1.79026, to = 1.54056)
+C2 <- as_multi_xy(C2)
+
+#C3
+C3 <- multi_xy_to_df(C3)
+C3$tth <- tth_transform(C3$tth, from = 1.79026, to = 1.54056)
+C3 <- as_multi_xy(C3)
+
+####Samples from Ponce Limestone
+PL <- multi_xy_to_df(PL)
+PL$tth <- tth_transform(PL$tth, from = 1.79026, to = 1.54056)
+PL <- as_multi_xy(PL)
+
+
+####Samples from microbialites in Providencia
+PS19 <- multi_xy_to_df(PS19)
+PS19$tth <- tth_transform(PS19$tth, from = 1.79026, to = 1.54056)
+PS19 <- as_multi_xy(PS19)
+
+PS2223 <- multi_xy_to_df(PS2223)
+PS2223$tth <- tth_transform(PS2223$tth, from = 1.79026, to = 1.54056)
+PS2223 <- as_multi_xy(PS2223)
+
+
+#### Microbial Mats in Salinas Vernales
+#POC
+POC <- multi_xy_to_df(POC)
+POC$tth <- tth_transform(POC$tth, from = 1.79026, to = 1.54056)
+POC <- as_multi_xy(POC)
+
+#POE
+POE <- multi_xy_to_df(POE)
+POE$tth <- tth_transform(POE$tth, from = 1.79026, to = 1.54056)
+POE <- as_multi_xy(POE)
+
+####Microbial matsa in Salinetas
+#JB
+JB <- multi_xy_to_df(JB)
+JB$tth <- tth_transform(JB$tth, from = 1.79026, to = 1.54056)
+JB <- as_multi_xy(JB)
+
+
+####Icacos Samples
+IC <- multi_xy_to_df(IC)
+IC$tth <- tth_transform(IC$tth, from = 1.79026, to = 1.54056)
+IC <- as_multi_xy(IC)
+
+####Aliyah Samples
+AliyahPO <- multi_xy_to_df(AliyahPO)
+AliyahPO$tth <- tth_transform(AliyahPO$tth, from = 1.79026, to = 1.54056)
+AliyahPO <- as_multi_xy(AliyahPO)
+
+
+
+print("All samples changed to Cu wavelentgth")
+
+
+
+
+
+##END
+
+
+```
+
+## Background fitting
+
+The background_subtract function is applied to a list of XRD spectra to remove the background signal. For each spectrum, the function estimates the background (using the bkg() function) and subtracts it from the measured counts. The output is a multi_xy list that is compatible with further analysis in the powdR package.
+
+```{r Background Fitting, ECHO = F, include=F}
+
+#Rock and cores
+PL_NoBkg <- background_subtract(PL)
+C3_NoBkg <- background_subtract(C3)
+C2_NoBkg <- background_subtract(C2)
+
+#Microbial deposits
+PS19_NoBkg <- background_subtract(PS19)
+PS2223_NoBkg <- background_subtract(PS2223)
+IC_NoBkg <- background_subtract(IC)
+POC_NoBkg <- background_subtract(POC)
+POE_NoBkg <- background_subtract(POE)
+JB_NoBkg <- background_subtract(JB)
+
+AliyahPO_NoBkg <- background_subtract(AliyahPO)
+
+print("All background substracted")
+```
+
+
+
+
+## Smooth Data
+
+Two smoothing functions are provided (Choose whichever smoothing method you want):
+1) savgol_smooth applies the Savitzky–Golay filter, which preserves peak shapes while reducing noise.
+2) moving_average_smooth applies a simple moving average filter that is effective for noise reduction, though it may slightly blunt sharp peaks.
+These functions operate on lists of spectra and return smoothed versions in the multi_xy format.
+
+
+```{r OPTION 1: Smooth data with savgol_smooth}
+#OPTION 1: Smooth data with savgol_smooth
+C3_NoBkg_Smooth <- savgol_smooth(C3_NoBkg, window = 15, polyorder = 3)
+C2_NoBkg_Smooth <- savgol_smooth(C2_NoBkg, window = 15, polyorder = 3)
+PS19_NoBkg_Smooth <- savgol_smooth(PS19_NoBkg, window = 15, polyorder = 3)
+PS2223_NoBkg_Smooth <- savgol_smooth(PS2223_NoBkg, window = 15, polyorder = 3)
+POC_NoBkg_Smooth <- savgol_smooth(POC_NoBkg, window = 15, polyorder = 3)
+POE_NoBkg_Smooth <- savgol_smooth(POE_NoBkg, window = 15, polyorder = 3)
+PL_NoBkg_Smooth <- savgol_smooth(PL_NoBkg, window = 15, polyorder = 3)
+#JB_NoBkg_Smooth <- savgol_smooth(JB_NoBkg, window = 15, polyorder = 3)
+
+AliyahPO_NoBkg_Smooth <- savgol_smooth(AliyahPO_NoBkg, window = 15, polyorder = 3)
+
+```
+
+```{r OPTION 2: Smooth data with moving_average_smooth}
+#PTION 2: Smooth data with moving_average_smooth
+C3_NoBkg_Smooth <- moving_average_smooth(C3_NoBkg, window = 15)
+C2_NoBkg_Smooth <- moving_average_smooth(C2_NoBkg, window = 15)
+PS19_NoBkg_Smooth <- moving_average_smooth(PS19_NoBkg, window = 15)
+PS2223_NoBkg_Smooth <- moving_average_smooth(PS2223_NoBkg, window = 15)
+POC_NoBkg_Smooth <- moving_average_smooth(POC_NoBkg, window = 15)
+POE_NoBkg_Smooth <- moving_average_smooth(POE_NoBkg, window = 15)
+
+
+```
+
+
+
+# Save Data for Alingment Code
+
+```{r Save data Before Alignment Code}
+
+
+#Merge all PS together
+PS <- list(PS19 = PS19, PS2223 = PS2223)
+
+PS_NoBkg <- list(PS19_NoBkg = PS19_NoBkg, PS2223_NoBkg = PS2223_NoBkg)
+
+PS_NoBkg_Smooth <- list(PS19_NoBkg_Smooth = PS19_NoBkg_Smooth, PS2223_NoBkg_Smooth = PS2223_NoBkg_Smooth)
+
+
+Data_WithBkg <- list(PL = PL, C3 = C3, C2 = C2, PS = PS, IC = IC, POC = POC, POE = POE, JB = JB)
+
+Data_NoBkg <- list(PL_NoBkg = PL_NoBkg, C3_NoBkg = C3_NoBkg, C2_NoBkg = C2_NoBkg, PS_NoBkg = PS_NoBkg, IC_NoBkg = IC_NoBkg, POC_NoBkg = POC_NoBkg, POE_NoBkg = POE_NoBkg, JB_NoBkg = JB_NoBkg, AliyahPO_NoBkg = AliyahPO_NoBkg)
+
+Data_NoBkg_Smooth <- list(C3_NoBkg_Smooth = C3_NoBkg_Smooth, C2_NoBkg_Smooth = C2_NoBkg_Smooth, PS_NoBkg_Smooth = PS_NoBkg_Smooth, POC_NoBkg_Smooth = POC_NoBkg_Smooth, POE_NoBkg_Smooth = POE_NoBkg_Smooth, PL_NoBkg_Smooth = PL_NoBkg_Smooth, JB_NoBkg = JB_NoBkg, AliyahPO_NoBkg_Smooth = AliyahPO_NoBkg_Smooth)
+
+
+#Save Data Before Alingment
+saveRDS(Data_WithBkg, file = "RData/Data_WithBkg.RDS")
+saveRDS(Data_NoBkg, file = "RData/Data_NoBkg.RDS")
+saveRDS(Data_NoBkg_Smooth, file = "RData/Data_NoBkg_Smooth.RDS")
+
+
+rm(PL)
+rm(C3)
+rm(C2)
+rm(PS)
+rm(IC)
+rm(POC)
+rm(POE)
+rm(JB)
+
+print("All data saved")
+
+```
+
+
+
+
+
+
+
+
+
+

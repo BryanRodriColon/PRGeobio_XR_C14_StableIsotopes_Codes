@@ -1,0 +1,382 @@
+---
+title: "XRD Standard Minerals: code 0"
+author: "Bryan Rodriguez"
+date: "2025-03-22"
+output: 
+  html_document:
+    self_contained: true
+    toc: true
+    toc_float: true
+    number_sections: true
+    theme: united
+    df_print: paged
+
+
+
+Description: This code will load and process the mineral standards files and d-spacing values for those standards. These are internal Standards. Im also including some Quality control standards as well.
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
+
+```
+
+
+```{r load packages, include=F, ECHO =F}
+library(powdR)
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(baseline)
+library(EEM)
+library(data.table)
+library(tidyverse)
+library(conflicted)
+library(stringr)
+library(signal)
+```
+
+
+
+# Functions
+
+## Function to substract background noise in XRD
+
+The background_subtract function is designed to remove the background signal from a list of XRD spectra. Each element in the input list is assumed to be a data frame containing two columns: tth (the 2θ values) and counts (the intensity values). For each spectrum, the function uses the bkg() function to estimate the background. It then subtracts this estimated background from the original counts to yield a background‐corrected spectrum. Finally, it returns all background-subtracted spectra as a multi_xy list, which is compatible with further processing using the powdR package.
+
+Key Points:
+
+Input: A list of data frames, each with columns tth and counts.
+Processing:
+Background is estimated using bkg().
+The background is subtracted from the original counts.
+Output: A named multi_xy list (via as_multi_xy) for use in subsequent analyses.
+
+```{r Function to substract Background}
+background_subtract <- function(data_frame_list) {
+  # Create an empty list to store the background-subtracted data frames
+  background_subtracted_list <- list()
+
+ # Loop through each data frame in the list
+  for (i in 1:length(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    
+    # Fit a background to the current data frame
+    bkg_result <- bkg(data_frame_list[[i]])
+    
+    # Calculate background subtracted count intensities
+    bkg_subtracted_counts <- bkg_result$counts - bkg_result$background
+    
+    # Create a new data frame with background subtracted data
+    bkg_subtracted_df <- data.frame("tth" = bkg_result$tth, "counts" = bkg_subtracted_counts)
+    
+    # Store the new data frame with its original name in the list
+    background_subtracted_list[[original_name]] <- bkg_subtracted_df
+  }
+  
+  # Return the named list of background-subtracted data frames
+  return(as_multi_xy(background_subtracted_list)) #Always put it back to the multi_xy_list format for powdR
+}
+```
+
+## Function for Braggs Equation
+
+This function, d_to_2theta, converts d-spacing values (typically in Ångströms) to 2θ values (in degrees) using Bragg’s law. Bragg’s law is expressed as:
+
+2θ = 2 * asin(λ / (2d))
+where:
+
+λ is the wavelength of the incident X-ray (default set to 1.5406 Å, appropriate for Cu Kα radiation),
+d is the interplanar spacing, and
+2θ is the diffraction angle.
+The function calculates the 2θ values by first computing the arcsine of λ divided by 2d, doubling that value, and then converting the result from radians to degrees by multiplying by (180/π).
+
+```{r Braggs equation function}
+# Define a function to convert d-spacing to 2θ
+d_to_2theta <- function(d_values, lambda = 1.5406) {
+  # Bragg's law: 2θ = 2 * asin(λ / (2d))
+  # Convert to degrees: multiply by 180 / π
+  two_theta <- 2 * asin(lambda / (2 * d_values)) * 180 / pi
+  return(two_theta)
+}
+
+```
+
+
+
+## Functions to smooth XRD Spectra
+### savgol_smooth function
+
+The function below, savgol_smooth, is designed to apply Savitzky–Golay smoothing to a list of XRD spectra. Each element in the list is a data frame (or multi_xy list) with two columns: tth (the 2θ values) and counts (the intensity). The function loops through each spectrum and applies the Savitzky–Golay filter—using the sgolayfilt function from the signal package—with user-defined parameters for the window size and polynomial order.
+
+Window (n): This is the number of data points used for the smoothing window and must be an odd number. Increasing the window size produces a smoother curve but may reduce the resolution of sharp peaks.
+Polynomial Order (p): This parameter sets the order of the polynomial fitted within each window. A higher order better preserves the shape of the peaks, although too high a value may start to follow the noise.
+The function then creates a new data frame for each spectrum with the original tth values and the smoothed counts, and returns the results as a multi_xy list (compatible with the powdR package). This function works similarly to your existing background_subtract function, but focuses on noise reduction while preserving peak shapes.
+
+```{r Function savgol_smooth}
+savgol_smooth <- function(data_frame_list, window = 13, polyorder = 3) {
+  # Create an empty list to store the smoothed data frames
+  smoothed_list <- list()
+  
+  # Loop through each data frame in the list
+  for (i in seq_along(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    df <- data_frame_list[[i]]
+    
+    # Apply Savitzky-Golay filter from the signal package to smooth the counts
+    smoothed_counts <- sgolayfilt(df$counts, p = polyorder, n = window)
+    
+    # Create a new data frame with the original tth and the smoothed counts
+    smoothed_df <- data.frame(tth = df$tth, counts = smoothed_counts)
+    
+    # Store the new data frame in the list, retaining the original name
+    smoothed_list[[original_name]] <- smoothed_df
+  }
+  
+  # Return the list in the multi_xy format (assuming you're using powdR)
+  return(as_multi_xy(smoothed_list))
+}
+
+```
+
+### moving_average_smooth Function
+
+The moving_average_smooth function applies a moving average filter to a list of XRD spectra. Each element in the input list should be a data frame containing the columns tth (2θ values) and counts (intensity). The function loops over each spectrum, computes the moving average over a specified window (default is 5 points), and creates a new data frame with the original tth values and the smoothed intensity values. The result is returned as a multi_xy list (compatible with the powdR package) for further processing. Adjust the window parameter to control the degree of smoothing.
+
+```{r moving_average_smooth function}
+moving_average_smooth <- function(data_frame_list, window = 5) {
+  # Create an empty list to store the smoothed data frames
+  smoothed_list <- list()
+  
+  # Loop through each data frame in the list
+  for (i in seq_along(data_frame_list)) {
+    original_name <- names(data_frame_list)[i]
+    df <- data_frame_list[[i]]
+    
+    # Apply the moving average filter using stats::filter
+    # rep(1/window, window) creates the averaging window (equal weights)
+    smoothed_counts <- stats::filter(df$counts, rep(1/window, window), sides = 2)
+    
+    # Create a new data frame with the original tth and the smoothed counts.
+    # Convert the filtered result to numeric in case it's a time series object.
+    smoothed_df <- data.frame(tth = df$tth, counts = as.numeric(smoothed_counts))
+    
+    # Store the new data frame in the list, retaining the original name
+    smoothed_list[[original_name]] <- smoothed_df
+  }
+  
+  # Return the list in the multi_xy_list format for powdR
+  return(as_multi_xy(smoothed_list))
+}
+
+```
+
+
+
+
+# Load and Process Data
+
+
+```{r To reset data without erasing functions}
+#To reset data without erasing functions
+rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
+```
+
+
+
+
+## Load Data
+```{r Load control minerals, warning=F}
+######################################################################
+#Internal Standards with 8389 steps
+Minerals_Standards8389 <-  list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Mineral_Standards8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+Minerals_Standards8389 <- extract_xy(Minerals_Standards8389)
+
+#Internal Standards with 2797 steps
+Minerals_Standards2797 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Mineral_Standards2797", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+Minerals_Standards2797 <- extract_xy(Minerals_Standards2797)
+
+
+
+```
+
+
+Loading quality control samples. These quality control samples includes calcite, dolomite, halite, quartz, gypsum and corundum mixes.
+```{r Load Quality Control samples, warning=FALSE}
+
+QC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/QC", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+QC <- extract_xy(QC)
+
+```
+
+## Process Data
+
+```{r Co -> Cu trasnformation}
+#Change the 2theta of my internal standards from Co to Cu
+Minerals_Standards8389 <- multi_xy_to_df(Minerals_Standards8389)
+Minerals_Standards8389$tth <- tth_transform(Minerals_Standards8389$tth, from = 1.79026, to = 1.54056)
+Minerals_Standards8389  <- as_multi_xy(Minerals_Standards8389)
+
+Minerals_Standards2797 <- multi_xy_to_df(Minerals_Standards2797)
+Minerals_Standards2797$tth <- tth_transform(Minerals_Standards2797$tth, from = 1.79026, to = 1.54056)
+Minerals_Standards2797  <- as_multi_xy(Minerals_Standards2797)
+
+#Change the 2theta of my QC from Co to Cu
+QC <- multi_xy_to_df(QC)
+QC$tth <- tth_transform(QC$tth, from = 1.79026, to = 1.54056)
+QC  <- as_multi_xy(QC)
+
+```
+
+
+
+```{r background susbtract}
+
+MinStds2797_NoBkg <- background_subtract(Minerals_Standards2797)
+MinStds8389_NoBkg <- background_subtract(Minerals_Standards8389)
+QC_NoBkg <- background_subtract(QC)
+
+```
+
+
+## Smooth Data
+
+Two smoothing functions are provided (Choose whichever smoothing method you want):
+1) savgol_smooth applies the Savitzky–Golay filter, which preserves peak shapes while reducing noise.
+2) moving_average_smooth applies a simple moving average filter that is effective for noise reduction, though it may slightly blunt sharp peaks.
+These functions operate on lists of spectra and return smoothed versions in the multi_xy format.
+
+
+```{r OPTION 1: Smooth data with savgol_smooth}
+
+stdsToSmooth_S2797 <- c("Aragonite_coral_standard_S2797", "Aragonite_Halite_coral_standard_S2797","Aragonite_Ooids_S2797")
+
+Rest_stds_S2797 <- MinStds2797_NoBkg[!(names(MinStds2797_NoBkg) %in% stdsToSmooth_S2797)]
+MinStds2797_NoBkg_Smooth <- savgol_smooth(MinStds2797_NoBkg[stdsToSmooth_S2797], window = 15, polyorder = 3)
+
+
+MinStds2797_NoBkg_Smooth <- c(MinStds2797_NoBkg_Smooth, Rest_stds_S2797)
+MinStds8389_NoBkg_Smooth <- savgol_smooth(MinStds8389_NoBkg, window = 15, polyorder = 3)
+
+QC_NoBkg_Smooth <- savgol_smooth(QC_NoBkg, window = 15, polyorder = 3)
+
+rm(stdsToSmooth_S2797)
+rm(Rest_stds_S2797)
+
+```
+
+```{r OPTION 2: Smooth data with moving_average_smooth}
+stdsToSmooth_S2797 <- c("Aragonite_coral_standard_S2797", "Aragonite_Halite_coral_standard_S2797","Aragonite_Ooids_S2797")
+Rest_stds_S2797 <- MinStds2797_NoBkg[!(names(MinStds2797_NoBkg) %in% stdsToSmooth_S2797)]
+MinStds2797_NoBkg_Smooth <- moving_average_smooth(MinStds2797_NoBkg, window = 15)
+
+MinStds2797_NoBkg_Smooth <- c(MinStds2797_NoBkg_Smooth, Rest_stds_S2797)
+MinStds8389_NoBkg_Smooth <- moving_average_smooth(MinStds8389_NoBkg, window = 15)
+
+QC_NoBkg_Smooth <- moving_average_smooth(QC_NoBkg, window = 15)
+
+
+rm(stdsToSmooth_S2797)
+rm(Rest_stds_S2797)
+```
+
+
+# d_spacing ofstandard minerals
+
+The d_to_2theta function converts d-spacing values (interplanar distances) to diffraction angles (2θ) using Bragg’s law. This conversion is essential when matching d-spacing data from literature with experimental 2θ positions.
+
+```{r dspacing Values}
+# d spacing values for aragonite
+d_aragonite <- c(3.397091, 3.273516, 2.872130, 2.701932, 2.410616, 2.373082, 2.190354, 2.106366, 1.977602, 1.814891, 1.743147, 1.499512, 1.466895, 1.261535, 1.224189)
+# d spacing values for dolomite
+d_dolomite <- c(4.029704, 3.693905, 2.885447, 2.668198, 2.538166, 2.403953, 2.191820, 2.064501, 2.014852, 1.846952, 1.803652, 1.785987, 1.566207, 1.544195)
+# d spacing values for calcite
+d_calcite <- c(3.852645, 3.033741, 2.841612, 2.493492, 2.283385, 2.093312, 1.926322, 1.911180, 1.874227, 1.624943, 1.603246, 1.524408)
+# d spacing values for valerite
+d_valerite <- c(3.57, 3.30, 2.73, 2.065, 1.858, 1.823, 1.647)
+# d spacing values for magnesite
+d_magnesite <- c(2.742, 2.503, 2.102, 1.939, 1.700, 1.338, 0.9134)
+# d spacing values for halite
+d_halite <- c(3.257218, 2.820833, 1.994630, 1.701027, 1.68609, 1.410417, 1.261515, 1.151600)
+# d spacing values for quartz
+d_quartz <- c(4.257, 3.342, 2.457, 2.282, 1.18179, 1.5418, 1.3718)
+# d spacing values for gypsum
+d_gypsum <- c(7.63, 4.28, 3.80, 3.07, 2.87, 2.69, 2.22, 2.09)
+```
+
+```{r change d spacing to 2theta}
+
+#Use Braggs Equation Function
+
+# For aragonite (CaCO3)
+theta2_aragonite <- d_to_2theta(d_aragonite)
+
+# For dolomite (CaMg(CO3)2)
+theta2_dolomite <- d_to_2theta(d_dolomite) 
+# For calcite (CaCO3)
+theta2_calcite <- d_to_2theta(d_calcite)
+# For valerite (CaCO3)
+theta2_valerite <- d_to_2theta(d_valerite)
+# For magnesite (MgCO3)
+theta2_magnesite <- d_to_2theta(d_magnesite)
+# For halite (NaCl)
+theta2_halite <- d_to_2theta(d_halite)
+# For Quartz (SiO2)
+theta2_quartz <- d_to_2theta(d_quartz)
+# For Gypsum (CaSO4)
+theta2_gypsum <- d_to_2theta(d_gypsum)
+
+
+```
+
+```{r Dolomite Ordering Peaks}
+
+#Make a vector with the d spacing with the (101), (015) and (021) ordering reflections of dolomite, respectively.
+ord_dol_peaks <- c(4.029704, 2.885447, 2.538166, 2.064501)
+
+#Get the 2thetas
+theta2_ord_dol_peaks <- d_to_2theta(ord_dol_peaks) # Bragg's equation
+
+```
+
+
+```{r merging data into lists}
+
+#Make a list with all main peaks
+mins_mainPeaks <- list("Aragonite" = theta2_aragonite, "Dolomite" = theta2_dolomite, "Calcite" = theta2_calcite, "valerite" = theta2_valerite, "Magnesite" =  theta2_magnesite, "Halite" = theta2_halite, "Quartz" = theta2_quartz, "Gypsum" = theta2_gypsum, "dol_ordering_peaks" = theta2_ord_dol_peaks)
+
+#Make a list with all standards
+min_standards <- list(Minerals_Standards8389 = Minerals_Standards8389, Minerals_Standards2797 = Minerals_Standards2797, MinStds2797_NoBkg = MinStds2797_NoBkg, MinStds8389_NoBkg = MinStds8389_NoBkg, MinStds2797_NoBkg_Smooth = MinStds2797_NoBkg_Smooth, MinStds8389_NoBkg_Smooth = MinStds8389_NoBkg_Smooth)
+
+QC_Data <- list(QC=QC, QC_NoBkg = QC_NoBkg, QC_NoBkg_Smooth = QC_NoBkg_Smooth)
+
+
+```
+
+
+# Saving Data for Code 1
+
+```{r}
+
+#Save mineral standards
+saveRDS(min_standards, file = "RData/min_standards.RDS")
+saveRDS(mins_mainPeaks, file = "RData/mins_mainPeaks.RDS")
+
+#Save QC
+saveRDS(QC_Data, file = "RData/QC_Data.RDS")
+
+```
+
+
+
+
