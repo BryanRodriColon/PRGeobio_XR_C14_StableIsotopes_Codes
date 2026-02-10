@@ -17,7 +17,7 @@ Description: X-Ray Difracction data Processing - Puerto Rico
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
+setwd("/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes")
 
 ```
 
