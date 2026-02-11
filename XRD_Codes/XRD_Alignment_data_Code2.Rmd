@@ -19,8 +19,7 @@ description: This code portion is for alignment of all the samples (the ones wit
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
-
+setwd("/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes")
 ```
 
 
@@ -188,7 +187,7 @@ C2_NoBkg <- DataNobkgSmooth_file_list$C2_NoBkg_Smooth
 C3_NoBkg <- DataNobkgSmooth_file_list$C3_NoBkg_Smooth
 POC_NoBkg <- DataNobkgSmooth_file_list$POC_NoBkg_Smooth
 POE_NoBkg <- DataNobkgSmooth_file_list$POE_NoBkg_Smooth
-JB_NoBkg <- DataNobkgSmooth_file_list$JB_NoBkg_Smooth
+JB_NoBkg <- DataNobkgSmooth_file_list$JB_NoBkg
 rm(DataNobkgSmooth_file_list)
 
 
@@ -591,7 +590,7 @@ tth_diff6Final <- calculate_tth_AlignmentDiff(PL_NoBkg$PL_6_NoHalite,
                                                30.9, 31.2)
 PL_NoBkg$PL_6_NoHalite <- align_xy(PL_NoBkg$PL_6_NoHalite, 
                                    std = PL_NoBkg$PL_6_Halite, 
-                                   xmin = 4.31, xmax = 74, 
+                                   xmin = min(PL_NoBkg$PL_6_Halite$tth), xmax = 74, 
                                    xshift = tth_diff6Final)
 
 ## PL-9:#### 
@@ -662,14 +661,14 @@ tth_diffCanalFinal <- calculate_tth_AlignmentDiff(PL_NoBkg$PL_Canal,
                                                    29.06, 30.04)
 PL_NoBkg$PL_Canal <- align_xy(PL_NoBkg$PL_Canal, 
                              std = PL_NoBkg$PL_canal_Halite, 
-                             xmin = 4.31, xmax = 74, 
+                             xmin = min(PL_NoBkg$PL_canal_Halite$tth), xmax = 74, 
                              xshift = tth_diffCanalFinal)
 
 
 print("Ponce Limestone Alignment done")
 ```
 
-```{r Eliminate all values to understature the Enviroment}
+```{r Eliminate all values to understature the Environment}
 rm(list = ls()[sapply(ls(), function(x) {
   obj <- get(x)
   is.atomic(obj) || is.factor(obj)

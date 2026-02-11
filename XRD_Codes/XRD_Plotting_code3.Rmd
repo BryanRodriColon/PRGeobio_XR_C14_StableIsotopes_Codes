@@ -18,7 +18,7 @@ Description: This code portion is only to plot the XRD data
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
+setwd("/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes")
 
 ```
 
@@ -53,7 +53,7 @@ library(htmlwidgets)
 minstds_file_list <- readRDS("RData/min_standards.RDS")
 MinStds8389_NoBkg <-minstds_file_list$MinStds8389_NoBkg_Smooth
 MinStds2797_NoBkg <- minstds_file_list$MinStds2797_NoBkg_Smooth
-MinStds2797_NoBkg <- as_multi_xy(MinStds2797_NoBkg)
+#MinStds2797_NoBkg <- as_multi_xy(MinStds2797_NoBkg)
 rm(minstds_file_list)
 
 # Main peaks
@@ -137,7 +137,9 @@ List_POC <- as_multi_xy(list("PO19_01C03_Crust_green" = POC_NoBkg$PO19_01C03_Cru
 
 List_PS19 <- as_multi_xy(list("PS19_Upper.crust1" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Upper.crust1, "PS19_Upper.crust2" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Upper.crust2, "PS19_Middle.Lithifed" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Middle.Lithifed, "PS19_Black.Layer" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Black.Layer, "PS19_L.below.Black" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_L.below.Black, "PS19_Bottom.Lithified" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Bottom.Lithified, "aragonite" = MinStds2797_NoBkg$Aragonite_coral_standard_S2797, "halite" = MinStds2797_NoBkg$Halite_S2797, "calcite" = MinStds2797_NoBkg$Calcite_S2797, "HMC" = MinStds2797_NoBkg$HigMgCal_S2797, "dolomite" = MinStds2797_NoBkg$Dolomite_S2797))
 
-plot(List_PS19, wavelength = "Cu", normalise = T, interactive = T) #Choose whichever you want to plot
+List_Cores_compare <- as_multi_xy(list("C2_10cm" = C2_NoBkg$d10cm, "C2_15cm" = C2_NoBkg$d15cm, "C3_13cm" = C3_NoBkg$d13cm))
+
+plot(C3_NoBkg, wavelength = "Cu", normalise = T, interactive = T) #Choose whichever you want to plot
 ```
 
 
@@ -147,7 +149,7 @@ plot(List_PS19, wavelength = "Cu", normalise = T, interactive = T) #Choose which
 ```{r}
 
 #ForPaper
-ForPaper <- plot(PS_NoBkg$PS19_NoBkg_Smooth, xlim = c(28, 32), wavelength = "Cu", normalise = T) +
+ForPaper <- plot(List_Cores_compare$C2_15cm, wavelength = "Cu", normalise = T) +
   theme_bw()
 
 plot(PL_NoBkg$Sand_Canal, wavelength = "Cu", normalise = T) +
@@ -160,23 +162,23 @@ plot(PL_NoBkg$Sand_Canal, wavelength = "Cu", normalise = T) +
 
 
 # Save as SVG
-ggsave("plots/PS_ZoomedRegion.svg", plot = ForPaper, width = 10, height = 8)
+ggsave("plots/ForPaper.svg", plot = ForPaper, width = 10, height = 8)
 ```
 
 
 
 # Plotting with ggplot
 
-In the following markdown, I will create a code that will plot only one set of samples. The only thing you will havr to change is the plot_data dataframe information. 
+In the following markdown, I will create a code that will plot only one set of samples. The only thing you will have to change is the plot_data dataframe information. 
 
 ```{r ggplot for manuscripts}
 
 
-plot_data <- as_multi_xy(PL_NoBkg) #Change the sample list to whichever one you desire. 
+plot_data <- as_multi_xy(C2_NoBkg) #Change the sample list to whichever one you desire. 
 
 
 # Pivot the data from wide to long format for plotting
-df_long <- pivot_longer(PL_NoBkg, 
+df_long <- pivot_longer(C2_NoBkg$d15cm, 
                         cols = -tth, 
                         names_to = "sample", 
                         values_to = "counts")
@@ -193,10 +195,10 @@ plotIllustrator <- ggplot(df_norm, aes(x = tth, y = norm_counts, color = sample)
        x = "2θ", 
        y = "Intensity", 
        color = "Sample") +
-  scale_x_continuous(limits = c(10, 58), 
-                     breaks = seq(10, 58, by = 5), 
-                     minor_breaks = seq(10, 58, by = 1),
-                     guide = guide_axis_minor()) +
+  #scale_x_continuous(limits = c(10, 58), 
+                    # breaks = seq(10, 58, by = 5), 
+                     #minor_breaks = seq(10, 58, by = 1),
+                     #guide = guide_axis_minor()) +
   scale_y_continuous(limits = c(min(df_norm$norm_counts), max(df_norm$norm_counts))) +
   theme_minimal() +
   theme(
@@ -281,7 +283,7 @@ print("Interactive HTML file saved")
 
 
 # Save as SVG (for Illustrator editing) #Change the name everytime you change the dataset
-ggsave(filename = "plots/plotIllustrator_SciRep.svg", plot = plot_all, device = "svg", width = 13, height = 13, dpi = 300)
+ggsave(filename = "plots/plotIllustrator.svg", plot = plotIllustrator, device = "svg", width = 13, height = 13, dpi = 300)
 print("SVG file saved")
 
 

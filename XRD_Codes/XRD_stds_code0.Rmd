@@ -20,8 +20,7 @@ Description: This code will load and process the mineral standards files and d-s
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting")
-
+setwd("/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes")
 ```
 
 
@@ -199,11 +198,11 @@ rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
 ```{r Load control minerals, warning=F}
 ######################################################################
 #Internal Standards with 8389 steps
-Minerals_Standards8389 <-  list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Mineral_Standards8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+Minerals_Standards8389 <-  list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/Mineral_Standards8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 Minerals_Standards8389 <- extract_xy(Minerals_Standards8389)
 
 #Internal Standards with 2797 steps
-Minerals_Standards2797 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Mineral_Standards2797", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+Minerals_Standards2797 <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/Mineral_Standards2797", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 Minerals_Standards2797 <- extract_xy(Minerals_Standards2797)
 
 
@@ -214,7 +213,7 @@ Minerals_Standards2797 <- extract_xy(Minerals_Standards2797)
 Loading quality control samples. These quality control samples includes calcite, dolomite, halite, quartz, gypsum and corundum mixes.
 ```{r Load Quality Control samples, warning=FALSE}
 
-QC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/QC", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+QC <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/QC", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 QC <- extract_xy(QC)
 
 ```
