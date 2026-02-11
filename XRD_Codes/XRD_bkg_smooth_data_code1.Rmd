@@ -223,7 +223,7 @@ PS2223 <- extract_xy(PS2223)
 
 
 ####Data POE1 microbial mats samples (2019)
-POE <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/POE_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+POE <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/POE_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 POE <- extract_xy(POE)
 
 ####Data from JB
