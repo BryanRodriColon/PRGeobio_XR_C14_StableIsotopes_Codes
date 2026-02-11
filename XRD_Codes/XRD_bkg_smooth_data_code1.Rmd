@@ -189,7 +189,7 @@ rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
 ```{r Load data, ECHO=F, include=FALSE}
 
 ####Data for core C2
-C2 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/C2_S8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+C2 <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/C2_S8389", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 C2 <- extract_xy(C2)
 
 #Fix the 2theta data from C2 (steps 8389) using the function MultiXYShiftC2.
@@ -202,23 +202,23 @@ C2 <- MultiXYShift(C2, 5.2, C2$d102cm$tth)
 
 
 ####Data for core C3
-C3 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/C3", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+C3 <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/C3", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 C3 <- extract_xy(C3)
 
 
 
 ####Data from Ponce Limestone (James)
-PL <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PonceLimestone", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PL <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/PonceLimestone", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 PL <- extract_xy(PL)
 
 
 ####Data from microbialites (from 2019)
-PS19 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PS19", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PS19 <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/PS19", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 PS19 <- extract_xy(PS19)
 
 ####Data from microbialites (2022 and 2023)
 
-PS2223 <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/PS2223/", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+PS2223 <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/PS2223", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 PS2223 <- extract_xy(PS2223)
 
 
@@ -227,23 +227,23 @@ POE <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PRO
 POE <- extract_xy(POE)
 
 ####Data from JB
-JB <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/JB_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+JB <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/JB_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 JB <- extract_xy(JB)
 
 
 ####Data from POC
-POC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/POC_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
+POC <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/POC_2019", recursive = TRUE, pattern = "\\.txt$",  full.names = TRUE)
 POC <- extract_xy(POC)
 
 
 
 #### Icacos microbialite Sample
-IC <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Icacos", recursive = T, pattern = "\\.txt$", full.names = T)
+IC <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/Icacos", recursive = T, pattern = "\\.txt$", full.names = T)
 IC <- extract_xy(IC)
 
 
 #### Aliyahs PO samples
-AliyahPO <- list.files(path = "~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRD/R_plotting/InputData/Aliyah_PO_Data/", recursive = T, pattern = "\\.txt$", full.names = T)
+AliyahPO <- list.files(path = "/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRD_Codes/InputData/Aliyah_PO_Data/", recursive = T, pattern = "\\.txt$", full.names = T)
 AliyahPO <- extract_xy(AliyahPO)
 
 
