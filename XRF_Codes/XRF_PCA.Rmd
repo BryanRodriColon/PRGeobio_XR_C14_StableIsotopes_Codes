@@ -1,0 +1,706 @@
+---
+title: "XRF_PCA"
+output: html_document
+date: "2024-04-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+setwd("~/Library/CloudStorage/OneDrive-UniversityofKansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRF/R-Plotting")
+
+```
+
+Stop data displayed in scientific notation
+```{r stop scipen}
+options(scipen = 999)
+```
+
+
+
+```{r load packages, warning=FALSE}
+
+library(magick)
+library(tiff)
+library(readr)
+library(signal) 
+library(raster)
+library(ggplot2)
+library(gridExtra)
+library(png)
+library(grid)
+library(ggbiplot)
+library(plotly)
+library(compositions)
+library(ggrepel)
+library(tidyr)
+library(MASS)
+library(zCompositions)
+library(dplyr)
+```
+
+
+```{r To reset data without erasing functions}
+rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
+```
+
+
+```{r Load data}
+#PS-C2
+XRF_C2 <- read.csv("input/XRF_data_C2.csv")
+# C2 depths
+C2_depth <- scan("input/XRF_data_C2_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+
+#PC-C3
+XRF_C3 <- read.csv("input/XRF_data_C3.csv")
+# C3 depths
+C3_depth <- scan("input/XRF_data_C3_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+
+```
+
+
+
+
+```{r Check LOQ}
+# Estimate approximate LOQ for Sb at 10s exposure
+Sb_LOQ_30s <- 1740   # assumed conservative value
+Sb_LOQ_10s <- Sb_LOQ_30s * (10/30)
+
+# Check mean counts
+mean_counts_Sb <- mean(XRF_C2$Zr, na.rm = TRUE)
+
+# Check if Sb is reliably above LOQ
+if(mean_counts_Sb < Sb_LOQ_30s){
+  message("Sb is below the LOQ; likely analytical noise.")
+} else {
+  message("Sb is above the LOQ; check for spectral overlap.")
+}
+
+```
+
+
+
+
+
+#Functions
+
+```{r clr transformation function}
+clr_transform <- function(data, selected_elements, depth_data) {
+  # Subset the data to include only the selected elements
+  subset_data <- data[, selected_elements]
+  
+  # Ensure depth_data is a vector (if it's not already)
+  depth_vec <- depth_data
+  
+  # Replace zeros with half of the minimum non-zero value in each column
+  replaceZeros <- function(x) {
+    nonzero <- x[x > 0 & !is.na(x)]
+    if (length(nonzero) > 0) {
+      x[x == 0] <- min(nonzero) / 2
+    }
+    return(x)
+  }
+  subset_data_clean <- as.data.frame(lapply(subset_data, replaceZeros))
+  
+  # Identify the rows with complete cases (no NA values)
+  complete_idx <- complete.cases(subset_data_clean)
+  
+  # Subset the cleaned data and the depth vector using the same indices
+  subset_data_clean <- subset_data_clean[complete_idx, ]
+  depth_clean <- depth_vec[complete_idx]
+  
+  # Compute the geometric mean for each row
+  geomMean <- apply(subset_data_clean, 1, function(x) exp(mean(log(x))))
+  
+  # Compute the clr transformation for each element in each row
+  clr_data <- subset_data_clean  # initialize a data frame for clr values
+  for (i in 1:nrow(subset_data_clean)) {
+    clr_data[i, ] <- log(subset_data_clean[i, ] / geomMean[i])
+  }
+  
+  # Add the depth information to the clr_data dataframe as the first column
+  clr_data$Depth <- depth_clean
+  clr_data <- clr_data[, c("Depth", setdiff(names(clr_data), "Depth"))]
+  
+  return(clr_data)
+}
+
+```
+
+#clr-transformation for both sediment cores
+
+```{r Clean element list for noise prior to clr-tranformation}
+
+# All elements and set thresholds
+elements <- c("Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Ti", "V", "Cr", "Mn", "Fe", "Ni", "Cu", "Zn", "Ge", "As", "Br", "Rb", "Sr", "Y", "Zr", "Sb", "Cs", "Ba", "Ce", "Pr", "Nd", "Sm", "Pb") #32 elements
+
+zero_threshold <- 0.80
+count_threshold <- 40
+
+# Identify numeric (element) columns only
+elements_C2 <- XRF_C2[elements] %>% dplyr::select(where(is.numeric))
+elements_C3 <- XRF_C3[elements] %>% dplyr::select(where(is.numeric))
+
+
+# Calculate stats in one step
+stats_C2 <- data.frame(
+  element    = names(elements_C2),
+  prop_zero  = colMeans(elements_C2 == 0, na.rm=TRUE),
+  mean_count = colMeans(elements_C2, na.rm=TRUE)
+)
+
+stats_C3 <- data.frame(
+  element    = names(elements_C3),
+  prop_zero  = colMeans(elements_C3 == 0, na.rm=TRUE),
+  mean_count = colMeans(elements_C3, na.rm=TRUE)
+)
+
+# Filter based on your thresholds
+elements_keep_C2 <- stats_C2 %>%
+  filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
+  pull(element)
+
+elements_keep_C2 <- elements_keep_C2[!elements_keep_C2 %in% c("Sb", "Zr", "Ge")] #Take out Sb and Zr, as this is an analyitical error
+
+
+elements_keep_C3 <- stats_C3 %>%
+  filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
+  pull(element)
+
+elements_keep_C3 <- c(elements_keep_C3, "S", "K") #Include Sulfur and potassium for C3
+
+elements_keep_C3 <- elements_keep_C3[!elements_keep_C3 %in% c("Sb", "Zr", "Ge")]
+
+
+print("C2 elements to keep:")
+print(elements_keep_C2)
+
+print("C3 elements to keep:")
+print(elements_keep_C3)
+
+rm(stats_C2)
+rm(stats_C3)
+rm(elements_C2)
+rm(elements_C3)
+
+```
+
+
+```{r perform clr-transormation in sediment core data}
+
+clr_data_C2 <- clr_transform(XRF_C2, elements_keep_C2, C2_depth)
+
+clr_data_C3 <- clr_transform(XRF_C3, elements_keep_C3, C3_depth)
+
+```
+
+
+#C2 Analysis
+
+```{r PCA C2}
+
+# --- Subset Data for PCA ---
+# Only include the elements you wish to use for the PCA
+subset_data_C2 <- clr_data_C2 %>% dplyr::select(-c("Depth", "K", "Cl")) #Taking pout K and Cl as they are probably artifacts from the drying process. 
+
+
+# --- Perform PCA on clr-transformed data ---
+pca_results_C2 <- prcomp(subset_data_C2, center = TRUE, scale. = TRUE)
+
+# --- Extract PCA Scores ---
+scores_C2 <- data.frame(pca_results_C2$x[, 1:2])
+colnames(scores_C2) <- c("PC1", "PC2")
+
+# --- Add Depth and Facies Information ---
+# Here, we assume you have a depth vector (Depth_cm) from your original data.
+# Adjust this accordingly if Depth_cm is stored elsewhere.
+scores_C2$Depth <- clr_data_C2$Depth  # Replace 'original_data' with your depth data frame
+
+# Create facies based on depth intervals:
+# ZC2A: 107-116 cm, ZC2B: 60-107 cm, ZC2C: 48-60 cm, ZC2D: 30-48 cm, ZC2E: 0-30 cm.
+scores_C2$Facies <- cut(scores_C2$Depth,
+                     breaks = c(0, 30, 45, 48, 58, 107, 116),
+                     labels = c("ZC2A", "ZC2B", "M1", "ZC2C", "ZC2D", "ZC2E"),
+                     include.lowest = TRUE, right = TRUE)
+
+# --- Extract and scale Loadings ---
+loadings_C2 <- pca_results_C2$rotation[, 1:2] * 
+  matrix(pca_results_C2$sdev[1:2], nrow = nrow(pca_results_C2$rotation), ncol = 2, byrow = TRUE)
+loadings_C2 <- data.frame(loadings_C2)
+colnames(loadings_C2) <- c("PC1", "PC2")
+loadings_C2$variable <- rownames(loadings_C2)
+
+####Scale Loadings to the same coordinate system as the scores (using the maximum absolute score). OPTIONAL###
+#scale_factor <- max(abs(scores_C2$PC1), abs(scores_C2$PC2))
+#loadings_scaled_C2 <- loadings_C2
+#loadings_scaled_C2$PC1 <- loadings_scaled_C2$PC1 * scale_factor
+#loadings_scaled_C2$PC2 <- loadings_scaled_C2$PC2 * scale_factor
+
+rm(subset_data_C2)
+
+```
+
+
+
+```{r Plot C2 Individual Factor Map (OPTIONAL)}
+
+# --- Create the PCA Biplot (Individual Factor Map) ---
+pcaC2_biplot_facies <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
+  theme_minimal() +
+  labs(title = "PCA Biplot with Facies for Core C2",
+       x = "PC1", y = "PC2", color = "Facies")
+
+# Print the plot
+print(pcaC2_biplot_facies)
+
+interactive_plot_PCA_C2 <- ggplotly(pcaC2_biplot_facies, tooltip = c("x", "y", "color", "text"))
+```
+
+
+
+
+```{r Plot C2 only the eigenvectors without the scores}
+
+# Create the correlation biplot with fixed axes [-1, 1]
+pca_biplot_cor_C2 <- ggplot() +
+  geom_segment(data = loadings_C2, 
+               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
+               arrow = arrow(length = unit(0.2, "cm")), 
+               color = "black") +
+  geom_text_repel(data = loadings_C2, 
+                  aes(x = PC1, y = PC2, label = variable), 
+                  color = "red", size = 4) +
+  theme_minimal() +
+  labs(title = "Correlation Biplot from clr-transformed XRF Data in C2", 
+       x = "PC1", y = "PC2") +
+  xlim(-1, 1) +
+  ylim(-1, 1)
+
+print(pca_biplot_cor_C2)
+
+
+```
+
+
+```{r plot C2 PCA in facets without loadings}
+pcaC2_biplot_facies_facets_C2 <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
+  facet_wrap(~ Facies) +
+  theme_minimal() +
+  labs(title = "PCA Biplot Faceted by Facies for Core C2",
+       x = "PC1", y = "PC2", color = "Facies")
+
+pcaC2_biplot_facies_facets_C2
+
+```
+
+
+```{r LDA in C2 (OPTIONAL, DO NOT USE)}
+
+# Assuming clr_data_C2 is your clr-transformed data with a column named "Depth" in mm
+# Define facies based on depth intervals in mm:
+clr_data_C2$Facies <- cut(clr_data_C2$Depth,
+                          breaks = c(0, 30, 48, 60, 107, 116),
+                          labels = c("ZC2A", "ZC2B", "ZC2C", "ZC2D", "ZC2E"),
+                          include.lowest = TRUE, right = TRUE)
+
+# Check the distribution of facies to ensure each group has observations:
+print(table(clr_data_C2$Facies))
+
+# Define the predictor elements for LDA
+elements_C2_LDA <- elements_keep_C2
+
+# Prepare the data for LDA by subsetting to the chosen elements and the facies column
+lda_data <- clr_data_C2[, c(elements_C2_LDA, "Facies")]
+
+# Perform LDA using the chosen elements to discriminate among facies
+lda_model <- lda(Facies ~ ., data = lda_data)
+lda_pred <- predict(lda_model)
+
+# Combine the LDA scores with facies information
+lda_scores <- data.frame(lda_pred$x)
+lda_scores$Facies <- lda_data$Facies
+
+# Plot the first two linear discriminants
+lda_plot <- ggplot(lda_scores, aes(x = LD1, y = LD2, color = Facies)) +
+  geom_point(size = 2) +
+  labs(title = "LDA of Core C2 clr-transformed Data",
+       x = "LD1",
+       y = "LD2",
+       color = "Facies") +
+  theme_minimal()
+
+print(lda_plot)
+
+
+
+```
+
+
+```{r Explained variance and Correlation Matrix for C2}
+# Explained Variance
+explained_variance_C2 <- pca_results_C2$sdev^2 / sum(pca_results_C2$sdev^2)
+explained_variance_perc_C2 <- explained_variance_C2 * 100
+
+# Print Explained Variance
+print(explained_variance_perc_C2)
+
+# Creating the barplot for Explained Variance
+pc_var_C2 <- data.frame(PC = seq(along = explained_variance_perc_C2), Variance = explained_variance_perc_C2)
+barplot_C2 <- ggplot(pc_var_C2, aes(x = factor(PC), y = Variance)) +
+    geom_bar(stat = "identity", fill = "gray") +
+    labs(x = "Principal Component", y = "Percentage of Variance Explained (%)") +
+    ggtitle("Scree Plot of PCA in C2") +
+    theme_minimal()
+
+# Print the barplot
+barplot_C2
+
+# Print Loadings Correlation Matrix
+cor_loadings_C2 <- pca_results_C2$rotation  # PCA loadings
+cor_matrix_C2 <- cor(cor_loadings_C2)
+cor_matrix_C2
+
+names(explained_variance_perc_C2) <- colnames(cor_matrix_C2)
+
+```
+
+
+```{r Save Figures and data for C2}
+
+#Saving PCA plots
+ggsave("plots/C2/pca_biplot_cor_C2.svg", pca_biplot_cor_C2, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/C2/pca_biplot_cor_C2.tiff", pca_biplot_cor_C2, width = 6, height = 6, dpi = 300)
+ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.svg", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.tiff", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, dpi = 300)
+
+ggsave("plots/C2/pcaC2_biplot_facies.svg", pcaC2_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
+
+
+#Save barplot
+ggsave("plots/C2/barplot_C2.svg", barplot_C2, width = 6, height = 6, units = "in", device = "svg")
+
+
+#Save CLR and PCA scores for MATLAB plotting
+write.csv(clr_data_C2, file = "outputFiles/C2/clr_data_C2.csv", row.names = FALSE)
+write.csv(scores_C2, file = "outputFiles/C2/PCA_data_C2.csv", row.names = FALSE)
+write.csv(explained_variance_perc_C2, file = "outputFiles/C2/C2_Variance_Perc.csv", row.names = FALSE)
+
+#Save correlation Matrix as a CSV file
+
+write.csv(cor_matrix_C2, file = "outputFiles/C2/correlation_matrix_C2.csv", row.names = T)
+
+rm(pca_biplot_cor_C2)
+rm(pcaC2_biplot_facies_facets_C2)
+rm(cor_matrix_C2)
+rm(scores_C2)
+rm(XRF_C2)
+rm(clr_data_C2)
+rm(pca_results_C2)
+rm(loadings_C2)
+rm(pc_var_C2)
+rm(cor_loadings_C2)
+rm(barplot_C2)
+
+```
+
+
+#C3 Analysis
+
+
+```{r PCA C3}
+
+# --- Subset Data for PCA ---
+# Only include the elements you wish to use for the PCA
+subset_data_C3 <- clr_data_C3 %>% dplyr::select(-c("Depth", "K", "Cl"))
+
+# --- Perform PCA on clr-transformed data ---
+pca_results_C3 <- prcomp(subset_data_C3, center = TRUE, scale. = TRUE)
+
+# --- Extract PCA Scores ---
+scores_C3 <- data.frame(pca_results_C3$x[, 1:2])
+colnames(scores_C3) <- c("PC1", "PC2")
+
+# --- Add Depth and Facies Information ---
+# Here, we assume you have a depth vector (Depth_cm) from your original data.
+# Adjust this accordingly if Depth_cm is stored elsewhere.
+scores_C3$Depth <- clr_data_C3$Depth  # Replace 'original_data' with your depth data frame
+
+# Create facies based on depth intervals:
+# ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
+scores_C3$Facies <- cut(scores_C3$Depth,
+                     breaks = c(0, 15, 38, 53.6, 94),
+                     labels = c("ZC3A", "ZC3B", "ZC3C", "ZC3D"),
+                     include.lowest = TRUE, right = TRUE)
+
+#Eliminate ant NaN values
+scores_C3 <- scores_C3[complete.cases(scores_C3), ]
+
+
+# --- Extract and scale Loadings ---
+loadings_C3 <- pca_results_C3$rotation[, 1:2] * 
+  matrix(pca_results_C3$sdev[1:2], nrow = nrow(pca_results_C3$rotation), ncol = 2, byrow = TRUE)
+loadings_C3 <- data.frame(loadings_C3)
+colnames(loadings_C3) <- c("PC1", "PC2")
+loadings_C3$variable <- rownames(loadings_C3)
+
+####Scale Loadings to the same coordinate system as the scores (using the maximum absolute score). OPTIONAL###
+#scale_factor_C3 <- max(abs(scores_C3$PC1), abs(scores_C3$PC2))
+#loadings_scaled_C3 <- loadings_C3
+#loadings_scaled_C3$PC1 <- loadings_scaled_C3$PC1 * scale_factor_C3
+#loadings_scaled_C3$PC2 <- loadings_scaled_C3$PC2 * scale_factor_C3
+
+rm(subset_data_C3)
+
+```
+
+
+```{r Plot C3 Individual Factor Map (OPTIONAL)}
+
+# --- Create the PCA Biplot (Individual Factor Map) ---
+pcaC3_biplot_facies <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
+  theme_minimal() +
+  labs(title = "PCA Biplot with Facies for Core C3",
+       x = "PC1", y = "PC2", color = "Facies")
+
+# Print the plot
+print(pcaC3_biplot_facies)
+
+interactive_plot_PCA_C3 <- ggplotly(pcaC3_biplot_facies, tooltip = c("x", "y", "color", "text"))
+```
+
+```{r Plot C3 only the eigenvectors without the scores}
+
+# Create the correlation biplot with fixed axes [-1, 1]
+pca_biplot_cor_C3 <- ggplot() +
+  geom_segment(data = loadings_C3, 
+               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
+               arrow = arrow(length = unit(0.2, "cm")), 
+               color = "black") +
+  geom_text_repel(data = loadings_C3, 
+                  aes(x = PC1, y = PC2, label = variable), 
+                  color = "red", size = 4) +
+  theme_minimal() +
+  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3", 
+       x = "PC1", y = "PC2") +
+  xlim(-1, 1) +
+  ylim(-1, 1)
+
+print(pca_biplot_cor_C3)
+
+
+```
+
+
+```{r plot C3 PCA in facets without loadings}
+pcaC2_biplot_facies_facets_C3 <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
+  facet_wrap(~ Facies) +
+  theme_minimal() +
+  labs(title = "PCA Biplot Faceted by Facies for Core C3",
+       x = "PC1", y = "PC2", color = "Facies")
+
+pcaC2_biplot_facies_facets_C3
+
+```
+
+```{r Explained variance and Correlation Matrix for C3}
+# Explained Variance
+explained_variance_C3 <- pca_results_C3$sdev^2 / sum(pca_results_C3$sdev^2)
+explained_variance_perc_C3 <- explained_variance_C3 * 100
+
+# Print Explained Variance
+print(explained_variance_perc_C3)
+
+# Creating the barplot for Explained Variance
+pc_var_C3 <- data.frame(PC = seq(along = explained_variance_perc_C3), Variance = explained_variance_perc_C3)
+barplot_C3 <- ggplot(pc_var_C3, aes(x = factor(PC), y = Variance)) +
+    geom_bar(stat = "identity", fill = "gray") +
+    labs(x = "Principal Component", y = "Percentage of Variance Explained (%)") +
+    ggtitle("Scree Plot of PCA in C3") +
+    theme_minimal()
+
+# Print the barplot
+barplot_C3
+
+# Print Loadings Correlation Matrix
+cor_loadings_C3 <- pca_results_C3$rotation  # PCA loadings
+cor_matrix_C3 <- cor(cor_loadings_C3)
+cor_matrix_C3
+
+names(explained_variance_perc_C3) <- colnames(cor_matrix_C3)
+```
+
+
+
+```{r Save Figures and data for C3}
+
+#Saving PCA plots
+ggsave("plots/C3/pca_biplot_cor_C3.svg", pca_biplot_cor_C3, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/C3/pca_biplot_cor_C3.tiff", pca_biplot_cor_C3, width = 6, height = 6, dpi = 300)
+ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.svg", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.tiff", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, dpi = 300)
+
+ggsave("plots/C3/pcaC3_biplot_facies.svg", pcaC3_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
+
+
+#Save barplot
+ggsave("plots/C3/barplot_C3.svg", barplot_C3, width = 6, height = 6, units = "in", device = "svg")
+
+
+#Save CLR and PCA scores for MATLAB plotting
+write.csv(clr_data_C3, file = "outputFiles/C3/clr_data_C3.csv", row.names = FALSE)
+write.csv(scores_C3, file = "outputFiles/C3/PCA_data_C3.csv", row.names = FALSE)
+write.csv(explained_variance_perc_C3, file = "outputFiles/C3/C3_Variance_Perc.csv", row.names = FALSE)
+
+#Save correlation Matrix as a CSV file
+
+write.csv(cor_matrix_C3, file = "outputFiles/C3/correlation_matrix_C3.csv", row.names = T)
+
+
+```
+
+
+## C3 analysis by portions. 
+
+```{r Carbonate Sediment PCA}
+
+# --- Subset Data for PCA ---
+# Only include the elements you wish to use for the PCA
+C3_inorganic_og <- subset(clr_data_C3, Depth >=53.6 & Depth <=94)
+
+C3_inorganic <- C3_inorganic_og %>% select(-c("Depth", "K", "Cl"))
+
+# --- Perform PCA on clr-transformed data ---
+pca_results_C3_Peat <- prcomp(C3_inorganic, center = TRUE, scale. = TRUE)
+
+# --- Extract PCA Scores ---
+scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
+colnames(scores_C3_Peat) <- c("PC1", "PC2")
+
+# --- Add Depth and Facies Information ---
+# Here, we assume you have a depth vector (Depth_cm) from your original data.
+# Adjust this accordingly if Depth_cm is stored elsewhere.
+scores_C3_Peat$Depth <- C3_inorganic_og$Depth  # Replace 'original_data' with your depth data frame
+
+
+# --- Extract and scale Loadings ---
+loadings_C3_Peat <- pca_results_C3_Peat$rotation[, 1:2] * 
+  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
+loadings_C3_Peat <- data.frame(loadings_C3_Peat)
+colnames(loadings_C3_Peat) <- c("PC1", "PC2")
+loadings_C3_Peat$variable <- rownames(loadings_C3_Peat)
+
+# Create the correlation biplot with fixed axes [-1, 1]
+pca_biplot_cor_C3_Peat <- ggplot() +
+  geom_segment(data = loadings_C3_Peat, 
+               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
+               arrow = arrow(length = unit(0.2, "cm")), 
+               color = "black") +
+  geom_text_repel(data = loadings_C3_Peat, 
+                  aes(x = PC1, y = PC2, label = variable), 
+                  color = "red", size = 4) +
+  theme_minimal() +
+  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3- Peat", 
+       x = "PC1", y = "PC2") +
+  xlim(-1, 1) +
+  ylim(-1, 1)
+
+print(pca_biplot_cor_C3_Peat)
+
+
+```
+
+```{r Peat PCA}
+
+# --- Subset Data for PCA ---
+# Only include the elements you wish to use for the PCA
+C3_Peat <- subset(clr_data_C3, Depth >=0 & Depth <=53.5)
+
+C3_Peat <- C3_Peat %>% select(-c("Depth", "K", "Cl"))
+
+# --- Perform PCA on clr-transformed data ---
+pca_results_C3_Peat <- prcomp(C3_Peat, center = TRUE, scale. = TRUE)
+
+# --- Extract PCA Scores ---
+scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
+colnames(scores_C3_Peat) <- c("PC1", "PC2")
+
+# --- Add Depth and Facies Information ---
+# Here, we assume you have a depth vector (Depth_cm) from your original data.
+# Adjust this accordingly if Depth_cm is stored elsewhere.
+scores_C3_Peat$Depth <- C3_Peat$Depth  # Replace 'original_data' with your depth data frame
+
+# Create facies based on depth intervals:
+# ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
+scores_C3_Peat$Facies <- cut(scores_C3_Peat$Depth,
+                     breaks = c(0, 20, 40, 53),
+                     labels = c("ZC3A", "ZC3B", "ZC3C"),
+                     include.lowest = TRUE, right = TRUE)
+
+#Eliminate ant NaN values
+scores_C3_Peat <- scores_C3_Peat[complete.cases(scores_C3_Peat), ]
+
+
+# --- Extract and scale Loadings ---
+loadings_C3_Inor <- pca_results_C3_Peat$rotation[, 1:2] * 
+  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
+loadings_C3_Inor <- data.frame(loadings_C3_Inor)
+colnames(loadings_C3_Inor) <- c("PC1", "PC2")
+loadings_C3_Inor$variable <- rownames(loadings_C3_Inor)
+
+# Create the correlation biplot with fixed axes [-1, 1]
+pca_biplot_cor_C3_Carb <- ggplot() +
+  geom_segment(data = loadings_C3_Inor, 
+               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
+               arrow = arrow(length = unit(0.2, "cm")), 
+               color = "black") +
+  geom_text_repel(data = loadings_C3_Inor, 
+                  aes(x = PC1, y = PC2, label = variable), 
+                  color = "red", size = 4) +
+  theme_minimal() +
+  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3", 
+       x = "PC1", y = "PC2") +
+  xlim(-1, 1) +
+  ylim(-1, 1)
+
+print(pca_biplot_cor_C3_Carb)
+
+pcaC2_biplot_facies_facets_C3_Inor <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
+  facet_wrap(~ Facies) +
+  theme_minimal() +
+  labs(title = "PCA Biplot Faceted by Facies for Core C3",
+       x = "PC1", y = "PC2", color = "Facies")
+
+pcaC2_biplot_facies_facets_C3_Inor
+
+# --- Create the PCA Biplot (Individual Factor Map) ---
+pcaC3_biplot_facies_Inor <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
+  theme_minimal() +
+  labs(title = "PCA Biplot with Facies for Core C3",
+       x = "PC1", y = "PC2", color = "Facies")
+
+# Print the plot
+print(pcaC3_biplot_facies_Inor)
+
+interactive_plot_PCA_C3_Inor <- ggplotly(pcaC3_biplot_facies_Inor, tooltip = c("x", "y", "color", "text"))
+```
+
+
+
+
+
+
+
+
