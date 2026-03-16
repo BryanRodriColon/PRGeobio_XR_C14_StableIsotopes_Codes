@@ -1,0 +1,203 @@
+---
+title: 'Isotope Codes: Carbonates (Puerto Rico)'
+author: "Bryan Rodriguez"
+date: "2025-03-23"
+output: html_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/Isotopes/R_plotting")
+
+```
+
+
+
+```{r packages, include = F, echo = FALSE}
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(readxl)
+library(viridis)
+library(RColorBrewer)
+library(openintro)
+library(ggdist)
+library(htmlwidgets)
+library(sf)
+library(ggspatial)
+library(tidypaleo)
+library(colorspace)
+```
+
+
+#Load Data
+
+```{r Load data}
+
+#Carbonate Data
+Guanica_CarbData <- read.csv("InputData/Isotope_Data_Guanica.csv")
+
+#Fix interger chr in depth column
+IntergerColumns <- c("DepthCore_m")
+Guanica_CarbData <- Guanica_CarbData %>% mutate_if(names(.) %in% IntergerColumns, as.numeric)
+
+
+```
+
+#Plotting
+
+```{r Defined variables for plotting}
+
+# Generate distinct colors for C2 (blue shades) and C3 (orange shades)
+set.seed(42)
+c2_colors <- sample(brewer.pal(8, "Blues")[4:8], size = 5)
+c3_colors <- sample(brewer.pal(8, "Oranges")[4:8], size = 4)
+
+# Assign colors and shapes
+zone_colors <- c(
+  # C2 zones (shades of blue)
+  "ZC2E" = c2_colors[1], "ZC2D" = "black", "ZC2C" = c2_colors[3], 
+  "ZC2B" = "#4DAAE9", "ZC2A" = c2_colors[5],
+
+  # C3 zones (shades of orange)
+  "ZC3D" = "#8F3361", "ZC3C" = c3_colors[3], "ZC3B" = c3_colors[2], "ZC3A" = "#C65639",
+  
+  # Other groups (fixed colors)
+  "PLDolMixed" = "purple", "PLCalMixed" = "red", "PLDolTreated" = "orchid",
+  "SandMixed" = "grey28",
+  "PS_Top" = "green", "PS_BlackL" = "darkgreen"
+)
+
+zone_shapes <- c(
+  # C2 zones (unique shapes, new shape for ZC2A: diamond)
+  "ZC2E" = 18, "ZC2D" = 20, "ZC2C" = 2, "ZC2B" = 1, "ZC2A" = 15,  # Diamond shape for ZC2A
+  
+  # C3 zones (unique shapes, keeping ZC3B the same)
+  "ZC3D" = 8, "ZC3C" = 7, "ZC3B" = 6, "ZC3A" = 5,
+  
+  # Other groups (consistent shapes)
+  "PLDolMixed" = 19, "PLCalMixed" = 19, "PLDolTreated" = 19, # Circles for PL
+  "SandMixed" = 12,
+  "PS_Top" = 17, "PS_BlackL" = 17 # Filled triangles for microbialites
+)
+
+
+#If plotting with respect to minerals
+min_colors <- c("carbonate" = "blue", "gypsum" = "orange", "dolomite" = "red", "calcite" = "gray", "aragonite" = "purple", "mg-calcite" = "brown")
+min_shapes <- c("carbonate" = 15, "gypsum" = 17, "dolomite" = 20, "calcite" = 11, "aragonite" = 18, "mg-calcite" = 19)
+
+```
+
+
+```{r Oficial plot by Zones for paper}
+
+
+# Plot
+Sed_Carbs_Guanica <- ggplot(Guanica_CarbData, aes(x = d18O, y = d13C, color = Identifier_3, shape = Identifier_3)) +
+  geom_point(size = 3.5, stroke = 1, na.rm = TRUE) + # Black stroke for clarity
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  xlab(expression(paste(delta^{18}, O[phantom(0)][carb], " ", "(‰, VPDB)"))) +  # X-axis label
+  ylab(expression(paste(delta^{13}, C[phantom(0)][carb], " ", "(‰, VPDB)"))) +  # Y-axis label
+  ggtitle(expression(paste(delta^{13}, C[phantom(0)][carb], " ", "and", " ", delta^{18}, O[phantom(0)][carb], " ", "Values of different samples in Laguna Providencia and Montalva, Guánica, PR" ))) +
+  theme_minimal() +
+  theme(
+    legend.position = "right", 
+    legend.key.size = unit(0.5, "cm"), 
+    legend.title = element_text(hjust = 0.5, size = 12),  
+    legend.text = element_text(hjust = 0.5), 
+    plot.title = element_text(hjust = 0.15, size = 18, face = "bold"), 
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    plot.background = element_rect(fill = "white"),
+    panel.grid = element_blank(),         # Remove all grid lines
+    panel.border = element_rect(          # Add a square border
+      colour = "black", fill = NA, linewidth = 0.5
+    )
+  ) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray40") + # Solid axis lines
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray40") +
+  scale_x_continuous(breaks = seq(-6, 3, by = 1)) + 
+  scale_y_continuous(breaks = seq(-12, 5, by = 1)) +
+  coord_cartesian(xlim = c(-6, 3), ylim = c(-12, 5)) + # Adjust plot limits
+  labs(color = "Legend") +
+  labs(shape = "Legend") +
+  labs(fill = "Legend")
+
+
+
+
+
+# Display the plot
+Sed_Carbs_Guanica
+
+print("Plot ready to be modified on Illustrator")
+
+
+
+
+```
+
+
+```{r Make interactive plot}
+
+Interactive_Sed_Carbs_Guanica <- ggplot(Guanica_CarbData, aes(x = d18O, y = d13C, color = Identifier_3, shape = Identifier_3, text =Identifier_2, label = Mineralogy)) +
+  geom_point(size = 2.5, na.rm = T) +
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  xlab("d18O carb") +  # Set x-axis label
+  ylab("d13C carb") +  # Set y-axis label
+    ggtitle("Carbonate Isotope values across Laguna Providencia, Guánica, PR" ) +
+  theme_minimal() +
+  theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.15, size = 18), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+  geom_hline(yintercept = 0, linetype = "solid", color = "gray40") + # Solid axis lines
+  geom_vline(xintercept = 0, linetype = "solid", color = "gray40") + # Solid axis lines
+  scale_x_continuous(breaks = seq(-6, 3, by = 1)) + # Labels at every 1 interval
+  scale_y_continuous(breaks = seq(-12, 5, by = 1)) + # Labels at every 1 interval
+  coord_cartesian(xlim = c(-6, 3), ylim = c(-12, 5)) +
+  labs(color = "Legend") +
+  labs(shape = "Legend") +
+  labs(fill = "Legend") +
+  guides(fill=guide_legend(title="Legend"))
+
+#Make ggplotly
+Interactive_Sed_Carbs_Guanica <- ggplotly(Interactive_Sed_Carbs_Guanica, tooltip = c("x", "y", "color", "text", "label"))
+
+Interactive_Sed_Carbs_Guanica
+
+```
+
+
+
+```{r Saving Plots}
+
+
+# Save as an interactive HTML file
+saveWidget(Interactive_Sed_Carbs_Guanica, "plots/Interactive_Sed_Carbs_Guanica.html", selfcontained = T, libdir = NULL)
+print("Interactive HTML file Interactive_Sed_Carbs_Guanica saved")
+
+
+#Save as SVG (for Illustrator editing)
+ggsave("plots/Sed_Carbs_Guanica.svg", Sed_Carbs_Guanica, width = 6, height = 6, units = "in", device = "svg")
+print("SVG file saved as Sed_Carbs_Guanica.svg")
+
+
+# Save as TIFF
+ggsave(filename = "plots/Sed_Carbs_Guanica.tiff", plot = Sed_Carbs_Guanica, device = "tiff", width = 13, height = 13, dpi = 600, compression = "lzw")
+print("TIFF file saved as Sed_Carbs_Guanica.tiff")
+
+```
+
+
+
+

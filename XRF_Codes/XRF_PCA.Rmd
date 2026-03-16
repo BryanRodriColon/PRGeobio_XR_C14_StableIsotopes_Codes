@@ -8,7 +8,7 @@ date: "2024-04-30"
 knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
-setwd("~/Library/CloudStorage/OneDrive-UniversityofKansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/XRF/R-Plotting")
+setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRF_Codes')
 
 ```
 
@@ -220,8 +220,8 @@ scores_C2$Depth <- clr_data_C2$Depth  # Replace 'original_data' with your depth 
 # Create facies based on depth intervals:
 # ZC2A: 107-116 cm, ZC2B: 60-107 cm, ZC2C: 48-60 cm, ZC2D: 30-48 cm, ZC2E: 0-30 cm.
 scores_C2$Facies <- cut(scores_C2$Depth,
-                     breaks = c(0, 30, 45, 48, 58, 107, 116),
-                     labels = c("ZC2A", "ZC2B", "M1", "ZC2C", "ZC2D", "ZC2E"),
+                     breaks = c(0, 30, 48, 58, 107, 116),
+                     labels = c("ZC2A", "ZC2B", "ZC2C", "ZC2D", "ZC2E"),
                      include.lowest = TRUE, right = TRUE)
 
 # --- Extract and scale Loadings ---
@@ -434,7 +434,7 @@ scores_C3$Depth <- clr_data_C3$Depth  # Replace 'original_data' with your depth 
 # ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
 scores_C3$Facies <- cut(scores_C3$Depth,
                      breaks = c(0, 15, 38, 53.6, 94),
-                     labels = c("ZC3A", "ZC3B", "ZC3C", "ZC3D"),
+                     labels = c("ZC3A", "ZC3B" "ZC3C", "ZC3D"),
                      include.lowest = TRUE, right = TRUE)
 
 #Eliminate ant NaN values

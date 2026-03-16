@@ -1,0 +1,339 @@
+---
+title: 'Isotope Code 2: Organic Carbon and N (Puerto Rico)'
+author: "Bryan Rodriguez"
+date: "2025-03-24"
+output: html_document
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/StableIsotope_Plotting_Codes')
+
+```
+
+
+
+```{r packages, include = F, echo = FALSE}
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(readxl)
+library(viridis)
+library(RColorBrewer)
+library(openintro)
+library(ggdist)
+library(htmlwidgets)
+library(sf)
+library(ggspatial)
+library(tidypaleo)
+library(colorspace)
+```
+
+# Load data
+
+
+```{r Load Organic Carbon and Nitrogen Data, echo = F}
+
+#Organic Carbon and Nitrogen Data
+Guanica_OrgData <- read.csv("InputData/Org_isotope_Guanica_data.csv")
+IntergerColumns <- c("DepthCore_m")
+Guanica_OrgData <- Guanica_OrgData %>% mutate_if(names(.) %in% IntergerColumns, as.numeric)
+
+Guanica_OrgData <- na.omit(Guanica_OrgData) #excluding the ones that have low nitrogen concentration AND no d15N values
+rm(IntergerColumns)
+
+```
+
+
+# Statistics
+
+The code below will perform a t-test on ZC3C (overwash layers), to make a comparision with the other layers and see how their difference have any statistical relevance. Thanks to Dr. amtthew Allen for the idea. 
+
+```{r Statistical Significance test on Overswash event}
+#subset the zone
+ZC3C_Layer <- subset(Guanica_OrgData, Identifier_5 == "ZC3C")
+
+#test the code
+subset(ZC3C_Layer, Identifier_5 == "ZC3C")
+
+#subset not in the zone
+everyting_else <- subset(Guanica_OrgData, Identifier_5 != "ZC3C")
+
+#test the code
+subset(everyting_else, Identifier_5 == "ZC3C")
+
+#Perform t-test
+t.test(ZC3C_Layer$TOC_TN, everyting_else$TOC_TN)
+t.test(ZC3C_Layer$d13C_org, everyting_else$d13C_org)
+
+```
+
+
+# Plotting
+
+```{r}
+ellipse_points <- function(cx, cy, rx, ry, n = 200){
+  t <- seq(0, 2*pi, length.out = n)
+  data.frame(
+    x = cx + rx * cos(t),
+    y = cy + ry * sin(t)
+  )
+}
+
+ellipse_A <- ellipse_points(
+  cx = 42,     # center x
+  cy = -29,    # center y
+  rx = 20,     # horizontal radius
+  ry = 2
+)
+ellipse_A$type <- "TypeA"
+
+ellipse_B <- ellipse_points(
+  cx = 60,
+  cy = -26,
+  rx = 18,
+  ry = 1.5
+)
+ellipse_B$type <- "TypeB"
+
+ellipse_df <- rbind(ellipse_A, ellipse_B)
+
+
+```
+
+
+
+
+
+```{r Defined variables for plotting}
+
+# Generate distinct colors for C2 (blue shades) and C3 (orange shades)
+set.seed(42)
+c2_colors <- sample(brewer.pal(8, "Blues")[4:8], size = 5)
+c3_colors <- sample(brewer.pal(8, "Oranges")[4:8], size = 4)
+
+# Assign colors and shapes
+zone_colors <- c(
+  # C2 zones (shades of blue)
+  "ZC2E" = c2_colors[1], "ZC2D" = "black", "ZC2C" = c2_colors[3], 
+  "ZC2B" = "#4DAAE9", "ZC2A" = c2_colors[5],
+
+  # C3 zones (shades of orange)
+  "ZC3D" = "#8F3361", "ZC3C" = c3_colors[3], "ZC3B" = c3_colors[2], "ZC3A" = "#C65639",
+  
+  # Other groups (fixed colors)
+  "Microbialite" = "green")
+
+zone_shapes <- c(
+  # C2 zones (unique shapes, new shape for ZC2A: diamond)
+  "ZC2E" = 18, "ZC2D" = 20, "ZC2C" = 2, "ZC2B" = 1, "ZC2A" = 15,  # Diamond shape for ZC2A
+  
+  # C3 zones (unique shapes, keeping ZC3B the same)
+  "ZC3D" = 8, "ZC3C" = 7, "ZC3B" = 6, "ZC3A" = 5,
+  
+  # Other groups (consistent shapes)
+  "Microbialite" = 17)
+
+# Rectangle data for regions
+rect_data <- data.frame(
+  xmin = c(4, 13, 5, 20, 6),
+  xmax = c(7, 80, 10, 80, 9),
+  ymin = c(-27, -30, -24, -17, -24.5),
+  ymax = c(-12, -21, -18, 0, -16),
+  zone = c("Microbial", "C3 plants", "Marine POC", "C4 plants", "Marine Algae")  # Custom labels
+)
+
+
+rect_data <- data.frame(
+  xmin = c(4, 13, 5, 20, 6,
+           23.1, 114.5, 45.3,
+           20.1, 73, 48.6),
+  
+  xmax = c(7, 80, 10, 80, 9,
+           39, 195.1, 61.8,
+           52.4, 203.8, 64.7),
+  
+  ymin = c(-27, -30, -24, -17, -24.5,
+           -31.6, -28.7, -27.4,
+           -32.2, -28.5, -24.6),
+  
+  ymax = c(-12, -21, -18, 0, -16,
+           -28.5, -24.6, -26.6,
+           -29.8, -25.2, -24.5),
+  
+  zone = c("Microbial", "C3 plants", "Marine POC", "C4 plants", "Marine Algae",
+           "Extra1", "Extra2", "Extra3",
+           "Extra4", "Extra5", "Extra6")
+)
+
+ellipse_data <- data.frame(
+  x = c(23.1, 39, 45.3, 61.8, 114.5, 195.1,   # Extra1–3 envelope
+        20.1, 52.4, 48.6, 64.7, 73, 203.8),   # Extra4–6 envelope
+  y = c(-31.6, -28.5, -27.4, -26.6, -28.7, -24.6,
+        -32.2, -29.8, -24.6, -24.5, -28.5, -25.2),
+  group = c(rep("TypeA",6), rep("TypeB",6))
+)
+
+
+```
+
+
+```{r Plot for paper and for Illustrator}
+
+#Plot d13C_org vs. TOC_TN with color-coded markers based on Identifier_1
+
+Sed_Org_Guanica <- ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color = Identifier_5, shape = Identifier_5, text =DepthCore_cm)) +
+  geom_rect(
+    data = rect_data,
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = zone),
+    inherit.aes = FALSE,
+    alpha = 0.4
+  ) +
+  geom_point(size = 2.5, na.rm = TRUE) +
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  # scale_fill_manual(values = c(
+  #   "Microbial" = "#A7C09E",
+  #   "C3 plants" = "#D8AFA1",
+  #   "Marine POC" = "#D9C8B0",
+  #   "C4 plants" = "#BAAED1",
+  #   "Marine Algae" = "lightblue"
+  # )) +
+  scale_fill_manual(values = c(
+  "Microbial" = "#A7C09E",
+  "C3 plants" = "#D8AFA1",
+  "Marine POC" = "#D9C8B0",
+  "C4 plants" = "#BAAED1",
+  "Marine Algae" = "lightblue",
+  "Extra1" = "gray",
+  "Extra2" = "gray",
+  "Extra3" = "gray",
+  "Extra4" = "red",
+  "Extra5" = "red",
+  "Extra6" = "red"
+)) +
+  
+ geom_polygon(
+  data = ellipse_df,
+  aes(x = x, y = y, group = type, fill = type),
+  alpha = 0.15,
+  color = NA,
+  inherit.aes = FALSE
+) +
+  
+  geom_point(size = 3.5, na.rm = T) +
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  xlab(expression(paste(C[phantom(0)][org],"/",N[phantom(0)][total], " ", "(‰, VPDB)"))) +  # X-axis label
+  ylab(expression(paste(delta^{13}, C[phantom(0)][org], " ", "(‰, VPDB)"))) +  # Y-axis label
+  ggtitle(expression(paste(delta^{13}, C[phantom(0)][org], " ", "and", " ", C[phantom(0)][org],"/",N[phantom(0)][total], " ", "Values of sediment cores and microbialites in Laguna Providencia and Montalva, Guánica, PR" ))) +
+  theme_minimal() + # Uses a minimal theme for aesthetics
+
+theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.15, size = 16, face = "bold"), plot.background =   element_rect(fill = "white"), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), panel.grid = element_blank(), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+  
+scale_x_continuous(breaks = seq(0, 70, by = 5)) + # Labels at every 1 interval
+scale_y_continuous(breaks = seq(-28, -10, by = 2)) + # Labels at every 1 interval
+coord_cartesian(xlim = c(0, 70), ylim = c(-28, -10)) +
+labs(color = "Legend") +
+labs(shape = "Legend") +
+labs(fill = "Legend") +
+#guides(fill=guide_legend(title="Regions"))
+guides(fill="none")
+Sed_Org_Guanica
+print("Plot ready to be modified on Illustrator")
+
+```
+
+```{r Make interactive plot}
+
+Sed_Org_Guanica <-  ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color = Identifier_5, shape = Identifier_5, text =DepthCore_cm)) +
+  geom_rect(
+    data = rect_data,
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = zone),
+    inherit.aes = FALSE,
+    alpha = 0.4
+  ) +
+  geom_point(size = 2.5, na.rm = T) +
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  # scale_fill_manual(values = c(
+  #   "Microbial" = "#A7C09E",
+  #   "C3 plants" = "#D8AFA1",
+  #   "Marine POC" = "#D9C8B0",
+  #   "C4 plants" = "#BAAED1",
+  #   "Marine Algae" = "lightblue"
+  # )) +
+    scale_fill_manual(values = c(
+  "Microbial" = "#A7C09E",
+  "C3 plants" = "#D8AFA1",
+  "Marine POC" = "#D9C8B0",
+  "C4 plants" = "#BAAED1",
+  "Marine Algae" = "lightblue",
+  "Extra1" = "gray",
+  "Extra2" = "gray",
+  "Extra3" = "gray",
+  "Extra4" = "red",
+  "Extra5" = "red",
+  "Extra6" = "red"
+)) +
+  geom_point(size = 2.5, na.rm = T) +
+  scale_color_manual(values = zone_colors) +
+  scale_shape_manual(values = zone_shapes) +
+  ylab("d13Corg") +  # Set y-axis label
+  xlab("TOC/TN") +
+  ggtitle("Corg and TOC/TN biplot" ) +
+  theme_minimal() +
+   theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.3, size = 18), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+  scale_x_continuous(breaks = seq(0, 70, by = 5)) + # Labels at every 1 interval
+scale_y_continuous(breaks = seq(-28, -10, by = 2)) + # Labels at every 1 interval
+coord_cartesian(xlim = c(0, 70), ylim = c(-28, -10)) +
+  labs(color = "Legend") +
+labs(shape = "Legend") +
+labs(fill = "Legend")
+
+
+#Make ggplotly
+Interactive_Sed_Org_Guanica <- ggplotly(Sed_Org_Guanica, tooltip = c("x", "y", "color", "text"))
+
+Interactive_Sed_Org_Guanica
+
+
+
+```
+
+
+
+```{r Save plots}
+
+# Save as an interactive HTML file
+saveWidget(Interactive_Sed_Org_Guanica, "plots/Interactive_Sed_Org_Guanica.html", selfcontained = T, libdir = NULL)
+print("Interactive HTML file Interactive_Sed_Org_Guanica saved")
+
+
+#Save as SVG (for Illustrator editing)
+ggsave("plots/Sed_Org_Guanica.svg", Sed_Org_Guanica, width = 6, height = 6, units = "in", device = "svg")
+print("SVG file saved as Sed_Org_Guanica.svg")
+
+
+# Save as TIFF
+ggsave(filename = "plots/Sed_Org_Guanica_KhanAddition.tiff", plot = Sed_Org_Guanica, device = "tiff", width = 13, height = 7, dpi = 600, compression = "lzw")
+print("TIFF file saved as Sed_Org_Guanica.tiff")
+
+```
+
+
+
+
+
+
