@@ -52,6 +52,5 @@ rsconnect/
 .DS_Store
 *.tif
 *.tiff
-*.html
 *.svg
 
