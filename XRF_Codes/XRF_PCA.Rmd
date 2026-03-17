@@ -1,89 +1,169 @@
 ---
-title: "XRF_PCA"
+title: "Code 1: XRF clr-transformation"
+author: "Bryan Rodriguez-Colon"
 output: html_document
 date: "2024-04-30"
 ---
+
+## Overview
+
+This script performs preprocessing and centered log-ratio (clr) transformation of XRF-derived elemental count data from two sediment cores (C2 and C3) collected in southwestern Puerto Rico. The workflow prepares compositional geochemical data for downstream multivariate analyses (e.g., PCA) by addressing sparsity, noise, and constant-sum constraints inherent to XRF datasets.
+
+## Objectives
+
+1.  Import XRF elemental count data and associated depth vectors\
+2.  Apply quality control filtering to remove unreliable elements\
+3.  Transform compositional data using clr transformation\
+4.  Export processed datasets for modular downstream analysis
+
+## Workflow structure
+
+The script is organized into four main stages:
+
+### 1. Function definition
+
+A custom function (`clr_transform()`) is defined to perform compositional transformation, including: - Zero replacement\
+- Removal of incomplete observations\
+- Calculation of geometric mean\
+- clr transformation of elemental data\
+- Reintegration of depth information
+
+### 2. Data import
+
+XRF datasets and corresponding depth vectors are imported for: - Core C2 (PS-C2)\
+- Core C3 (PC-C3)
+
+Data were originally processed in MATLAB using workflows provided by the Sediment and Coastal Dynamics Laboratory (UMass Amherst), and exported for use in R.
+
+### 3. Data cleaning and element selection
+
+Elemental data are filtered using both automated and manual criteria:
+
+-   Removal of elements with:
+    -   High sparsity (\>80% zeros)\
+    -   Low signal intensity (\<40 mean counts)
+-   Manual exclusion of elements with known analytical issues:
+    -   Sb, Zr, Ge
+-   Core-specific adjustments are applied where geochemically justified (e.g., inclusion of S and K in C3)
+
+This step ensures that only statistically robust and geochemically meaningful variables are retained.
+
+### 4. clr transformation
+
+Filtered datasets are transformed using the centered log-ratio approach (Aitchison, 1986), which:
+
+-   Removes compositional closure effects\
+-   Enables valid multivariate statistical analysis\
+-   Standardizes data across samples
+
+The transformation is applied independently to each core.
+
+### 5. Data export
+
+The resulting clr-transformed datasets are saved as a single `.RData` <file:%60RData/clr_XRF_cores.RData>\`
+
+This enables a modular workflow where downstream analyses (e.g., PCA) can be conducted without repeating preprocessing steps.
+
+## Output
+
+The script produces:
+
+-   `clr_data_C2`: clr-transformed dataset for Core C2\
+-   `clr_data_C3`: clr-transformed dataset for Core C3
+
+Each dataset includes: - clr-transformed elemental variables\
+- Depth information for stratigraphic context
+
+## Reproducibility notes
+
+-   Element selection directly influences clr space and must remain consistent across analyses\
+-   Zero-replacement strategy follows standard compositional data practices but may influence low-abundance elements\
+-   MATLAB preprocessing steps are external to this workflow and are not included in the repository
+
+## References
+
+Sebastien Bertrand, Rik Tjallingii, Malin E Kylander, Bruno Wilhelm, Stephen J Roberts, et al., *Inorganic geochemistry of lake sediments: A review of analytical techniques and guidelines for data interpretation.* Earth-Science Reviews, 2024, 249, pp.104639.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
 rm(list = ls())
-setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/XRF_Codes')
+#setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XR_C14_StableIsotopes_Codes/XRF_Codes')
 
 ```
 
 Stop data displayed in scientific notation
+
 ```{r stop scipen}
 options(scipen = 999)
 ```
 
+```{r load packages, inclue = T, message = F}
 
+library(ggplot2)      # plotting (all figures)
+library(dplyr)        # data manipulation (select, filter, pipes)
 
-```{r load packages, warning=FALSE}
+library(compositions) # clr conceptual framework
+library(zCompositions) # zero-replacement (even if not used directly, justified)
 
-library(magick)
-library(tiff)
-library(readr)
-library(signal) 
-library(raster)
-library(ggplot2)
-library(gridExtra)
-library(png)
-library(grid)
-library(ggbiplot)
-library(plotly)
-library(compositions)
-library(ggrepel)
-library(tidyr)
-library(MASS)
-library(zCompositions)
-library(dplyr)
+library(MASS)         # LDA (lda function)
+library(ggrepel)      # label placement in biplots
+
+library(plotly)       # interactive plots
 ```
 
+# Functions
 
-```{r To reset data without erasing functions}
-rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
-```
+## `clr_trasnform()`
 
+The function `clr_transform()` performs a centered log-ratio (clr) transformation on XRF elemental count data to account for the compositional nature of geochemical datasets.
 
-```{r Load data}
-#PS-C2
-XRF_C2 <- read.csv("input/XRF_data_C2.csv")
-# C2 depths
-C2_depth <- scan("input/XRF_data_C2_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+### Inputs
 
-#PC-C3
-XRF_C3 <- read.csv("input/XRF_data_C3.csv")
-# C3 depths
-C3_depth <- scan("input/XRF_data_C3_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+-   `data`: dataframe containing XRF elemental counts\
+-   `selected_elements`: vector of element names to include in the transformation\
+-   `depth_data`: vector of depth values corresponding to each sample
 
-```
+### Pre-processing steps
 
+1.  **Element subsetting**\
+    Only the selected elements are retained from the input dataset to ensure that the clr transformation is applied to a consistent compositional subset.
 
+2.  **Zero replacement**\
+    Zeros are replaced with half of the minimum non-zero value within each element. This avoids undefined logarithmic operations during transformation while preserving relative differences between samples.
 
+3.  **Removal of incomplete cases**\
+    Rows containing missing values are excluded to ensure numerical stability in the transformation and consistency between geochemical and depth data.
 
-```{r Check LOQ}
-# Estimate approximate LOQ for Sb at 10s exposure
-Sb_LOQ_30s <- 1740   # assumed conservative value
-Sb_LOQ_10s <- Sb_LOQ_30s * (10/30)
+### clr transformation
 
-# Check mean counts
-mean_counts_Sb <- mean(XRF_C2$Zr, na.rm = TRUE)
+For each sample, the clr transformation is computed as:
 
-# Check if Sb is reliably above LOQ
-if(mean_counts_Sb < Sb_LOQ_30s){
-  message("Sb is below the LOQ; likely analytical noise.")
-} else {
-  message("Sb is above the LOQ; check for spectral overlap.")
-}
+clr(xᵢ) = ln(xᵢ / g(x))
 
-```
+where:
 
+-   xᵢ is the concentration (or count) of element *i*\
+-   g(x) is the geometric mean of all elements in that sample
 
+The geometric mean is calculated as:
 
+g(x) = exp(mean(log(x)))
 
+This transformation removes the constant-sum constraint inherent to compositional data and allows for valid multivariate statistical analysis (Aitchison, 1986).
 
-#Functions
+### Output
+
+The function returns a dataframe containing:
+
+-   clr-transformed elemental values\
+-   a `Depth` column appended as the first column for stratigraphic reference
+
+### Notes
+
+-   The clr transformation assumes that the data are compositional and strictly positive after zero replacement\
+-   The choice of elements included in the transformation influences the resulting clr space and should be consistent across analyses\
+-   This implementation follows standard compositional data analysis approaches commonly applied to XRF datasets in sedimentology and paleoenvironmental studies
 
 ```{r clr transformation function}
 clr_transform <- function(data, selected_elements, depth_data) {
@@ -128,7 +208,99 @@ clr_transform <- function(data, selected_elements, depth_data) {
 
 ```
 
+```{r To reset data without erasing functions}
+rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
+```
+
+# Loading data
+
+## Data import
+
+XRF elemental count data and corresponding depth vectors are imported for two sediment cores:
+
+-   **C2 core (PS-C2)**\
+-   **C3 core (PC-C3)**
+
+### Input files
+
+For each core, two files are used:
+
+1.  **Elemental data (CSV format)**\
+    Contains XRF elemental counts for each sample.
+
+2.  **Depth data (TXT format)**\
+    Contains corresponding depth values for each measurement.
+
+#### ***Note on Data provenance***
+
+The XRF datasets used in this script were exported from MATLAB-based processing workflows used to reduce and calibrate raw XRF scanner data. These MATLAB codes are not included in this repository, as they were not developed by the author. They were provided by co-author Pedro Matos-Llavona, who obtained them from the Sediment and Coastal Dynamics Laboratory at the University of Massachusetts Amherst.
+
+### Data structure
+
+-   Each row in the XRF dataset corresponds to a single measurement\
+-   Columns represent elemental counts\
+-   Depth vectors are imported separately and later aligned with geochemical data during preprocessing
+
+This separation ensures flexibility in handling depth information and allows consistent indexing during clr transformation and downstream analyses.
+
+```{r Load data}
+#PS-C2
+XRF_C2 <- read.csv("input/XRF_data_C2.csv")
+# C2 depths
+C2_depth <- scan("input/XRF_data_C2_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+
+#PC-C3
+XRF_C3 <- read.csv("input/XRF_data_C3.csv")
+# C3 depths
+C3_depth <- scan("input/XRF_data_C3_depth.txt", sep = ",", what = numeric(), quiet = TRUE)
+
+```
+
 #clr-transformation for both sediment cores
+
+## Element selection and data cleaning prior to clr transformation
+
+Prior to applying the centered log-ratio (clr) transformation, elemental data were filtered to remove noise and ensure statistical robustness.
+
+### Elemental dataset
+
+An initial set of 32 elements was considered:
+
+Mg, Al, Si, P, S, Cl, Ar, K, Ca, Ti, V, Cr, Mn, Fe, Ni, Cu, Zn, Ge, As, Br, Rb, Sr, Y, Zr, Sb, Cs, Ba, Ce, Pr, Nd, Sm, Pb
+
+### Automated filtering criteria
+
+Elements were retained based on the following thresholds:
+
+-   **Zero proportion threshold**: ≤ 80% zeros\
+-   **Minimum mean count threshold**: ≥ 40 counts
+
+These criteria remove elements with: - Excessive sparsity (high proportion of zeros) - Low signal intensity (close to detection limits)
+
+### Manual quality control
+
+In addition to automated filtering, the following elements were **manually excluded**:
+
+-   Sb (antimony)\
+-   Zr (zirconium)\
+-   Ge (germanium)
+
+These elements showed inconsistent signal behavior during exploratory analysis and are interpreted as likely analytical artifacts (e.g., spectral overlap or detector-related noise).
+
+### Core-specific adjustments
+
+-   For **C3**, sulfur (S) and potassium (K) were reintroduced after filtering due to their geochemical relevance in that core.
+
+### Output
+
+Two cleaned element sets are generated:
+
+-   `elements_keep_C2`
+-   `elements_keep_C3`
+
+These represent the final variables used for compositional transformation and multivariate analysis.
+
+Temporary variables used during filtering are removed to maintain a clean workspace.
 
 ```{r Clean element list for noise prior to clr-tranformation}
 
@@ -158,14 +330,14 @@ stats_C3 <- data.frame(
 
 # Filter based on your thresholds
 elements_keep_C2 <- stats_C2 %>%
-  filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
+  dplyr::filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
   pull(element)
 
 elements_keep_C2 <- elements_keep_C2[!elements_keep_C2 %in% c("Sb", "Zr", "Ge")] #Take out Sb and Zr, as this is an analyitical error
 
 
 elements_keep_C3 <- stats_C3 %>%
-  filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
+  dplyr::filter(prop_zero <= zero_threshold, mean_count >= count_threshold) %>%
   pull(element)
 
 elements_keep_C3 <- c(elements_keep_C3, "S", "K") #Include Sulfur and potassium for C3
@@ -184,10 +356,7 @@ rm(stats_C3)
 rm(elements_C2)
 rm(elements_C3)
 
-```
-
-
-```{r perform clr-transormation in sediment core data}
+# clr-transofrmation:
 
 clr_data_C2 <- clr_transform(XRF_C2, elements_keep_C2, C2_depth)
 
@@ -195,512 +364,19 @@ clr_data_C3 <- clr_transform(XRF_C3, elements_keep_C3, C3_depth)
 
 ```
 
+# Saving dataframes
 
-#C2 Analysis
+```{r}
 
-```{r PCA C2}
+# Create output directory if it does not exist
+if(!dir.exists("Rdata")){
+  dir.create("RData", recursive = TRUE)
+}
 
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-subset_data_C2 <- clr_data_C2 %>% dplyr::select(-c("Depth", "K", "Cl")) #Taking pout K and Cl as they are probably artifacts from the drying process. 
+# Save both clr datasets together
+save(clr_data_C2, clr_data_C3,
+     file = "RData/clr_XRF_cores.RData")
 
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C2 <- prcomp(subset_data_C2, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C2 <- data.frame(pca_results_C2$x[, 1:2])
-colnames(scores_C2) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C2$Depth <- clr_data_C2$Depth  # Replace 'original_data' with your depth data frame
-
-# Create facies based on depth intervals:
-# ZC2A: 107-116 cm, ZC2B: 60-107 cm, ZC2C: 48-60 cm, ZC2D: 30-48 cm, ZC2E: 0-30 cm.
-scores_C2$Facies <- cut(scores_C2$Depth,
-                     breaks = c(0, 30, 48, 58, 107, 116),
-                     labels = c("ZC2A", "ZC2B", "ZC2C", "ZC2D", "ZC2E"),
-                     include.lowest = TRUE, right = TRUE)
-
-# --- Extract and scale Loadings ---
-loadings_C2 <- pca_results_C2$rotation[, 1:2] * 
-  matrix(pca_results_C2$sdev[1:2], nrow = nrow(pca_results_C2$rotation), ncol = 2, byrow = TRUE)
-loadings_C2 <- data.frame(loadings_C2)
-colnames(loadings_C2) <- c("PC1", "PC2")
-loadings_C2$variable <- rownames(loadings_C2)
-
-####Scale Loadings to the same coordinate system as the scores (using the maximum absolute score). OPTIONAL###
-#scale_factor <- max(abs(scores_C2$PC1), abs(scores_C2$PC2))
-#loadings_scaled_C2 <- loadings_C2
-#loadings_scaled_C2$PC1 <- loadings_scaled_C2$PC1 * scale_factor
-#loadings_scaled_C2$PC2 <- loadings_scaled_C2$PC2 * scale_factor
-
-rm(subset_data_C2)
+print("files are now ready for Code 2: XRF PCA analysis")
 
 ```
-
-
-
-```{r Plot C2 Individual Factor Map (OPTIONAL)}
-
-# --- Create the PCA Biplot (Individual Factor Map) ---
-pcaC2_biplot_facies <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
-  theme_minimal() +
-  labs(title = "PCA Biplot with Facies for Core C2",
-       x = "PC1", y = "PC2", color = "Facies")
-
-# Print the plot
-print(pcaC2_biplot_facies)
-
-interactive_plot_PCA_C2 <- ggplotly(pcaC2_biplot_facies, tooltip = c("x", "y", "color", "text"))
-```
-
-
-
-
-```{r Plot C2 only the eigenvectors without the scores}
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C2 <- ggplot() +
-  geom_segment(data = loadings_C2, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C2, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C2", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C2)
-
-
-```
-
-
-```{r plot C2 PCA in facets without loadings}
-pcaC2_biplot_facies_facets_C2 <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C2",
-       x = "PC1", y = "PC2", color = "Facies")
-
-pcaC2_biplot_facies_facets_C2
-
-```
-
-
-```{r LDA in C2 (OPTIONAL, DO NOT USE)}
-
-# Assuming clr_data_C2 is your clr-transformed data with a column named "Depth" in mm
-# Define facies based on depth intervals in mm:
-clr_data_C2$Facies <- cut(clr_data_C2$Depth,
-                          breaks = c(0, 30, 48, 60, 107, 116),
-                          labels = c("ZC2A", "ZC2B", "ZC2C", "ZC2D", "ZC2E"),
-                          include.lowest = TRUE, right = TRUE)
-
-# Check the distribution of facies to ensure each group has observations:
-print(table(clr_data_C2$Facies))
-
-# Define the predictor elements for LDA
-elements_C2_LDA <- elements_keep_C2
-
-# Prepare the data for LDA by subsetting to the chosen elements and the facies column
-lda_data <- clr_data_C2[, c(elements_C2_LDA, "Facies")]
-
-# Perform LDA using the chosen elements to discriminate among facies
-lda_model <- lda(Facies ~ ., data = lda_data)
-lda_pred <- predict(lda_model)
-
-# Combine the LDA scores with facies information
-lda_scores <- data.frame(lda_pred$x)
-lda_scores$Facies <- lda_data$Facies
-
-# Plot the first two linear discriminants
-lda_plot <- ggplot(lda_scores, aes(x = LD1, y = LD2, color = Facies)) +
-  geom_point(size = 2) +
-  labs(title = "LDA of Core C2 clr-transformed Data",
-       x = "LD1",
-       y = "LD2",
-       color = "Facies") +
-  theme_minimal()
-
-print(lda_plot)
-
-
-
-```
-
-
-```{r Explained variance and Correlation Matrix for C2}
-# Explained Variance
-explained_variance_C2 <- pca_results_C2$sdev^2 / sum(pca_results_C2$sdev^2)
-explained_variance_perc_C2 <- explained_variance_C2 * 100
-
-# Print Explained Variance
-print(explained_variance_perc_C2)
-
-# Creating the barplot for Explained Variance
-pc_var_C2 <- data.frame(PC = seq(along = explained_variance_perc_C2), Variance = explained_variance_perc_C2)
-barplot_C2 <- ggplot(pc_var_C2, aes(x = factor(PC), y = Variance)) +
-    geom_bar(stat = "identity", fill = "gray") +
-    labs(x = "Principal Component", y = "Percentage of Variance Explained (%)") +
-    ggtitle("Scree Plot of PCA in C2") +
-    theme_minimal()
-
-# Print the barplot
-barplot_C2
-
-# Print Loadings Correlation Matrix
-cor_loadings_C2 <- pca_results_C2$rotation  # PCA loadings
-cor_matrix_C2 <- cor(cor_loadings_C2)
-cor_matrix_C2
-
-names(explained_variance_perc_C2) <- colnames(cor_matrix_C2)
-
-```
-
-
-```{r Save Figures and data for C2}
-
-#Saving PCA plots
-ggsave("plots/C2/pca_biplot_cor_C2.svg", pca_biplot_cor_C2, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C2/pca_biplot_cor_C2.tiff", pca_biplot_cor_C2, width = 6, height = 6, dpi = 300)
-ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.svg", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.tiff", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, dpi = 300)
-
-ggsave("plots/C2/pcaC2_biplot_facies.svg", pcaC2_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
-
-
-#Save barplot
-ggsave("plots/C2/barplot_C2.svg", barplot_C2, width = 6, height = 6, units = "in", device = "svg")
-
-
-#Save CLR and PCA scores for MATLAB plotting
-write.csv(clr_data_C2, file = "outputFiles/C2/clr_data_C2.csv", row.names = FALSE)
-write.csv(scores_C2, file = "outputFiles/C2/PCA_data_C2.csv", row.names = FALSE)
-write.csv(explained_variance_perc_C2, file = "outputFiles/C2/C2_Variance_Perc.csv", row.names = FALSE)
-
-#Save correlation Matrix as a CSV file
-
-write.csv(cor_matrix_C2, file = "outputFiles/C2/correlation_matrix_C2.csv", row.names = T)
-
-rm(pca_biplot_cor_C2)
-rm(pcaC2_biplot_facies_facets_C2)
-rm(cor_matrix_C2)
-rm(scores_C2)
-rm(XRF_C2)
-rm(clr_data_C2)
-rm(pca_results_C2)
-rm(loadings_C2)
-rm(pc_var_C2)
-rm(cor_loadings_C2)
-rm(barplot_C2)
-
-```
-
-
-#C3 Analysis
-
-
-```{r PCA C3}
-
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-subset_data_C3 <- clr_data_C3 %>% dplyr::select(-c("Depth", "K", "Cl"))
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C3 <- prcomp(subset_data_C3, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C3 <- data.frame(pca_results_C3$x[, 1:2])
-colnames(scores_C3) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C3$Depth <- clr_data_C3$Depth  # Replace 'original_data' with your depth data frame
-
-# Create facies based on depth intervals:
-# ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
-scores_C3$Facies <- cut(scores_C3$Depth,
-                     breaks = c(0, 15, 38, 53.6, 94),
-                     labels = c("ZC3A", "ZC3B" "ZC3C", "ZC3D"),
-                     include.lowest = TRUE, right = TRUE)
-
-#Eliminate ant NaN values
-scores_C3 <- scores_C3[complete.cases(scores_C3), ]
-
-
-# --- Extract and scale Loadings ---
-loadings_C3 <- pca_results_C3$rotation[, 1:2] * 
-  matrix(pca_results_C3$sdev[1:2], nrow = nrow(pca_results_C3$rotation), ncol = 2, byrow = TRUE)
-loadings_C3 <- data.frame(loadings_C3)
-colnames(loadings_C3) <- c("PC1", "PC2")
-loadings_C3$variable <- rownames(loadings_C3)
-
-####Scale Loadings to the same coordinate system as the scores (using the maximum absolute score). OPTIONAL###
-#scale_factor_C3 <- max(abs(scores_C3$PC1), abs(scores_C3$PC2))
-#loadings_scaled_C3 <- loadings_C3
-#loadings_scaled_C3$PC1 <- loadings_scaled_C3$PC1 * scale_factor_C3
-#loadings_scaled_C3$PC2 <- loadings_scaled_C3$PC2 * scale_factor_C3
-
-rm(subset_data_C3)
-
-```
-
-
-```{r Plot C3 Individual Factor Map (OPTIONAL)}
-
-# --- Create the PCA Biplot (Individual Factor Map) ---
-pcaC3_biplot_facies <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
-  theme_minimal() +
-  labs(title = "PCA Biplot with Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-# Print the plot
-print(pcaC3_biplot_facies)
-
-interactive_plot_PCA_C3 <- ggplotly(pcaC3_biplot_facies, tooltip = c("x", "y", "color", "text"))
-```
-
-```{r Plot C3 only the eigenvectors without the scores}
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C3 <- ggplot() +
-  geom_segment(data = loadings_C3, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C3, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C3)
-
-
-```
-
-
-```{r plot C3 PCA in facets without loadings}
-pcaC2_biplot_facies_facets_C3 <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-pcaC2_biplot_facies_facets_C3
-
-```
-
-```{r Explained variance and Correlation Matrix for C3}
-# Explained Variance
-explained_variance_C3 <- pca_results_C3$sdev^2 / sum(pca_results_C3$sdev^2)
-explained_variance_perc_C3 <- explained_variance_C3 * 100
-
-# Print Explained Variance
-print(explained_variance_perc_C3)
-
-# Creating the barplot for Explained Variance
-pc_var_C3 <- data.frame(PC = seq(along = explained_variance_perc_C3), Variance = explained_variance_perc_C3)
-barplot_C3 <- ggplot(pc_var_C3, aes(x = factor(PC), y = Variance)) +
-    geom_bar(stat = "identity", fill = "gray") +
-    labs(x = "Principal Component", y = "Percentage of Variance Explained (%)") +
-    ggtitle("Scree Plot of PCA in C3") +
-    theme_minimal()
-
-# Print the barplot
-barplot_C3
-
-# Print Loadings Correlation Matrix
-cor_loadings_C3 <- pca_results_C3$rotation  # PCA loadings
-cor_matrix_C3 <- cor(cor_loadings_C3)
-cor_matrix_C3
-
-names(explained_variance_perc_C3) <- colnames(cor_matrix_C3)
-```
-
-
-
-```{r Save Figures and data for C3}
-
-#Saving PCA plots
-ggsave("plots/C3/pca_biplot_cor_C3.svg", pca_biplot_cor_C3, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C3/pca_biplot_cor_C3.tiff", pca_biplot_cor_C3, width = 6, height = 6, dpi = 300)
-ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.svg", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.tiff", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, dpi = 300)
-
-ggsave("plots/C3/pcaC3_biplot_facies.svg", pcaC3_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
-
-
-#Save barplot
-ggsave("plots/C3/barplot_C3.svg", barplot_C3, width = 6, height = 6, units = "in", device = "svg")
-
-
-#Save CLR and PCA scores for MATLAB plotting
-write.csv(clr_data_C3, file = "outputFiles/C3/clr_data_C3.csv", row.names = FALSE)
-write.csv(scores_C3, file = "outputFiles/C3/PCA_data_C3.csv", row.names = FALSE)
-write.csv(explained_variance_perc_C3, file = "outputFiles/C3/C3_Variance_Perc.csv", row.names = FALSE)
-
-#Save correlation Matrix as a CSV file
-
-write.csv(cor_matrix_C3, file = "outputFiles/C3/correlation_matrix_C3.csv", row.names = T)
-
-
-```
-
-
-## C3 analysis by portions. 
-
-```{r Carbonate Sediment PCA}
-
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-C3_inorganic_og <- subset(clr_data_C3, Depth >=53.6 & Depth <=94)
-
-C3_inorganic <- C3_inorganic_og %>% select(-c("Depth", "K", "Cl"))
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C3_Peat <- prcomp(C3_inorganic, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
-colnames(scores_C3_Peat) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C3_Peat$Depth <- C3_inorganic_og$Depth  # Replace 'original_data' with your depth data frame
-
-
-# --- Extract and scale Loadings ---
-loadings_C3_Peat <- pca_results_C3_Peat$rotation[, 1:2] * 
-  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
-loadings_C3_Peat <- data.frame(loadings_C3_Peat)
-colnames(loadings_C3_Peat) <- c("PC1", "PC2")
-loadings_C3_Peat$variable <- rownames(loadings_C3_Peat)
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C3_Peat <- ggplot() +
-  geom_segment(data = loadings_C3_Peat, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C3_Peat, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3- Peat", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C3_Peat)
-
-
-```
-
-```{r Peat PCA}
-
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-C3_Peat <- subset(clr_data_C3, Depth >=0 & Depth <=53.5)
-
-C3_Peat <- C3_Peat %>% select(-c("Depth", "K", "Cl"))
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C3_Peat <- prcomp(C3_Peat, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
-colnames(scores_C3_Peat) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C3_Peat$Depth <- C3_Peat$Depth  # Replace 'original_data' with your depth data frame
-
-# Create facies based on depth intervals:
-# ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
-scores_C3_Peat$Facies <- cut(scores_C3_Peat$Depth,
-                     breaks = c(0, 20, 40, 53),
-                     labels = c("ZC3A", "ZC3B", "ZC3C"),
-                     include.lowest = TRUE, right = TRUE)
-
-#Eliminate ant NaN values
-scores_C3_Peat <- scores_C3_Peat[complete.cases(scores_C3_Peat), ]
-
-
-# --- Extract and scale Loadings ---
-loadings_C3_Inor <- pca_results_C3_Peat$rotation[, 1:2] * 
-  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
-loadings_C3_Inor <- data.frame(loadings_C3_Inor)
-colnames(loadings_C3_Inor) <- c("PC1", "PC2")
-loadings_C3_Inor$variable <- rownames(loadings_C3_Inor)
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C3_Carb <- ggplot() +
-  geom_segment(data = loadings_C3_Inor, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C3_Inor, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C3_Carb)
-
-pcaC2_biplot_facies_facets_C3_Inor <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-pcaC2_biplot_facies_facets_C3_Inor
-
-# --- Create the PCA Biplot (Individual Factor Map) ---
-pcaC3_biplot_facies_Inor <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
-  theme_minimal() +
-  labs(title = "PCA Biplot with Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-# Print the plot
-print(pcaC3_biplot_facies_Inor)
-
-interactive_plot_PCA_C3_Inor <- ggplotly(pcaC3_biplot_facies_Inor, tooltip = c("x", "y", "color", "text"))
-```
-
-
-
-
-
-
-
-
