@@ -1,11 +1,150 @@
 ---
-title: 'Isotope Codes: Carbonates (Puerto Rico)'
+title: 'Code 1: isoCarbs'
 author: "Bryan Rodriguez"
 date: "2025-03-23"
 output: html_document
 ---
 
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
 
+# Overview
+
+This script generates carbonate stable isotope crossplots (δ¹³C vs δ¹⁸O) for sediment and carbonate samples collected from the Guánica coastal lagoon system, southwestern Puerto Rico.
+
+The code reads carbonate isotope data, defines color and symbol schemes corresponding to stratigraphic zones and sample groups, and produces two outputs:
+
+1. A publication-quality static plot used in the manuscript  
+2. An interactive plot for exploratory data visualization  
+
+The final figures are exported in formats suitable for publication and figure editing.
+
+## Associated manuscript
+
+Rodríguez-Colón, B. J., et al. (2026)  
+*Paleoenvironmental and Regional Controls on Microbialite Development and Distribution in a Coastal Lagoon of Southwestern Puerto Rico*  
+Sedimentology
+
+**Note:** The plots generated in this script are not included in the associated manuscript but are presented in the dissertation appendix corresponding to this chapter, where they support additional interpretation of carbonate isotope variability. The microbialite, beach sand, and Ponce Limestone datasets included in these plots are published in Rodríguez-Colón et al. (in review) in *Scientific Reports*.
+
+## Input data
+
+The script reads carbonate isotope data from: `Isotope_Data_Guanica.csv`
+
+
+The dataset contains measurements of:
+
+- δ¹³C (‰ VPDB)  
+- δ¹⁸O (‰ VPDB)  
+
+as well as metadata fields used for plotting:
+
+| Column         | Description                          |
+|----------------|--------------------------------------|
+| Identifier_2   | Sample identifier                    |
+| Identifier_3   | Sample group or stratigraphic zone   |
+| Mineralogy     | Dominant mineral phase               |
+| DepthCore_m    | Sample depth (meters)                |
+
+
+
+## Plot structure
+
+The plots generated in this script show:
+
+**X-axis**  
+δ¹⁸O (‰ VPDB)
+
+**Y-axis**  
+δ¹³C (‰ VPDB)
+
+These isotope values are widely used in carbonate sedimentology to interpret:
+
+- evaporative conditions  
+- diagenetic alteration  
+- mixing between marine and restricted waters  
+
+
+## Color and symbol scheme
+
+Samples are grouped using: `Identifier_3`
+
+
+Each group is assigned:
+
+- a unique color  
+- a unique symbol  
+
+### Stratigraphic groupings
+
+**C2 zones**  
+Displayed using blue color gradients.
+
+**C3 zones**  
+Displayed using orange color gradients.
+
+### Additional sample groups
+
+- Ponce Limestone mixed samples  
+- sand samples  
+- microbialite samples  
+
+These groupings correspond to stratigraphic and sedimentological units discussed in the manuscript.
+
+
+## Outputs
+
+### 1. Static publication plot
+
+Object name: `Sed_Carbs_Guanica`
+
+
+Exported as:
+
+**SVG (vector format for Illustrator)**  
+`plots/Sed_Carbs_Guanica.svg`
+
+
+**TIFF (high-resolution for journal submission)**  
+`plots/Sed_Carbs_Guanica.tiff`
+
+
+### 2. Interactive plot
+
+Object name: `Interactive_Sed_Carbs_Guanica`
+
+
+Includes hover information:
+
+- sample identifier  
+- mineralogy  
+- isotope values  
+
+Exported as:`plots/Interactive_Sed_Carbs_Guanica.html`
+
+
+
+
+## Reproducibility
+
+Expected folder structure:
+
+`StableIsotope_Plotting_Codes/`
+`InputData/Isotope_Data_Guanica.csv`
+`plots/`
+
+
+Running the script will generate all figures in the `plots/` directory.
+
+
+## Notes
+
+- All file paths are relative to the project directory  
+- The script assumes cleaned isotope data with consistent formatting  
+- Color and symbol assignments are manually defined to match manuscript figures  
+- Final figure formatting (e.g., label placement, font adjustments, panel alignment) may be refined in Adobe Illustrator; these edits do not alter data positions or the underlying dataset  
+
+
+# Script Set Up, Library calling and loading data
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -17,30 +156,27 @@ setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHA
 
 
 ```{r packages, include = F, echo = FALSE}
-library(ggplot2)
-library(ggsci)
-library(RColorBrewer)
-library(plotly)
-library(dplyr)
-library(tibble)
-library(purrr)
-library(ggpubr)
-library(lubridate)
-library(patchwork)
-library(readxl)
-library(viridis)
-library(RColorBrewer)
-library(openintro)
-library(ggdist)
-library(htmlwidgets)
-library(sf)
-library(ggspatial)
-library(tidypaleo)
-library(colorspace)
+library(ggplot2)      # Core plotting library for generating static figures
+library(RColorBrewer) # Provides color palettes used for stratigraphic grouping
+library(dplyr)        # Data manipulation and transformation (e.g., mutate, filtering)
+library(plotly)       # Converts ggplot objects into interactive visualizations
+library(htmlwidgets)  # Enables saving interactive plots as standalone HTML files
 ```
 
 
-#Load Data
+## Data import and preprocessing
+
+Carbonate stable isotope data are imported from: `InputData/Isotope_Data_Guanica.csv`
+
+
+This dataset contains δ¹³C and δ¹⁸O measurements along with associated metadata (e.g., sample identifiers, mineralogy, and depth).
+
+### Data type correction
+
+The column:`DepthCore_m` is explicitly converted to numeric format to ensure compatibility with downstream analyses and plotting functions.
+
+This step addresses potential issues arising from inconsistent data types (e.g., character values resulting from CSV import), which can interfere with quantitative operations and axis scaling.
+
 
 ```{r Load data}
 
@@ -54,7 +190,39 @@ Guanica_CarbData <- Guanica_CarbData %>% mutate_if(names(.) %in% IntergerColumns
 
 ```
 
-#Plotting
+# Plotting
+
+## Plot styling and grouping scheme
+
+This section defines the color and symbol mappings used to visualize carbonate stable isotope data according to stratigraphic zones and sample group classifications.
+
+### Color assignment
+
+Distinct color palettes are generated to differentiate major stratigraphic groupings:
+
+- **C2 zones** are represented using shades of blue  
+- **C3 zones** are represented using shades of orange  
+
+A fixed random seed (`set.seed(42)`) is used to ensure reproducibility of the sampled color subsets from the RColorBrewer palettes. Selected colors are drawn from mid-to-dark ranges of each palette to enhance visual contrast and readability.
+
+Additional sample groups are assigned fixed colors to maintain consistency across figures:
+
+- Ponce Limestone samples (mixed and treated)  
+- sand samples  
+- microbialite samples  
+
+These assignments ensure consistent visual representation across all plots in the project.
+
+### Shape assignment
+
+Each sample group (defined by `Identifier_3`) is also assigned a unique plotting symbol to allow simultaneous differentiation by both color and shape.
+
+- **C2 and C3 zones** are assigned distinct shapes to distinguish stratigraphic units  
+- **Ponce Limestone samples** are represented by filled circles  
+- **Sand samples** use a distinct symbol to separate them from carbonate samples  
+- **Microbialite samples** are represented by filled triangles  
+
+This dual encoding (color + shape) improves interpretability, particularly in grayscale reproduction or for color-vision deficiencies.
 
 ```{r Defined variables for plotting}
 
@@ -92,12 +260,18 @@ zone_shapes <- c(
 )
 
 
-#If plotting with respect to minerals
-min_colors <- c("carbonate" = "blue", "gypsum" = "orange", "dolomite" = "red", "calcite" = "gray", "aragonite" = "purple", "mg-calcite" = "brown")
-min_shapes <- c("carbonate" = 15, "gypsum" = 17, "dolomite" = 20, "calcite" = 11, "aragonite" = 18, "mg-calcite" = 19)
 
 ```
 
+## Generating Plot
+
+### Static isotope crossplot
+
+This section generates the primary carbonate isotope crossplot (δ¹³C vs δ¹⁸O) using `ggplot2`, with samples grouped by `Identifier_3` and styled using predefined color and shape schemes.
+
+The plot is formatted for publication, including labeled axes (VPDB), defined axis limits, and reference lines at δ¹³C = 0 and δ¹⁸O = 0. Visual styling is optimized for clarity and subsequent editing in Illustrator.
+
+An additional block is included below to generate an interactive version of this plot for exploratory analysis.
 
 ```{r Oficial plot by Zones for paper}
 
@@ -116,7 +290,7 @@ Sed_Carbs_Guanica <- ggplot(Guanica_CarbData, aes(x = d18O, y = d13C, color = Id
     legend.key.size = unit(0.5, "cm"), 
     legend.title = element_text(hjust = 0.5, size = 12),  
     legend.text = element_text(hjust = 0.5), 
-    plot.title = element_text(hjust = 0.15, size = 18, face = "bold"), 
+    plot.title = element_text(hjust = 0.15, size = 10, face = "bold"), 
     axis.title.x = element_text(size = 14),
     axis.title.y = element_text(size = 14),
     plot.background = element_rect(fill = "white"),
@@ -145,9 +319,9 @@ print("Plot ready to be modified on Illustrator")
 
 
 
-
 ```
 
+### Interactive Plot
 
 ```{r Make interactive plot}
 
@@ -159,7 +333,7 @@ Interactive_Sed_Carbs_Guanica <- ggplot(Guanica_CarbData, aes(x = d18O, y = d13C
   ylab("d13C carb") +  # Set y-axis label
     ggtitle("Carbonate Isotope values across Laguna Providencia, Guánica, PR" ) +
   theme_minimal() +
-  theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.15, size = 18), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+  theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.15, size = 10), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
   geom_hline(yintercept = 0, linetype = "solid", color = "gray40") + # Solid axis lines
   geom_vline(xintercept = 0, linetype = "solid", color = "gray40") + # Solid axis lines
   scale_x_continuous(breaks = seq(-6, 3, by = 1)) + # Labels at every 1 interval
@@ -175,9 +349,11 @@ Interactive_Sed_Carbs_Guanica <- ggplotly(Interactive_Sed_Carbs_Guanica, tooltip
 
 Interactive_Sed_Carbs_Guanica
 
+print("Interactive plot ready for inspection")
+
 ```
 
-
+# Saving Plots
 
 ```{r Saving Plots}
 

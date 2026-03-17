@@ -155,37 +155,6 @@ rect_data <- data.frame(
 )
 
 
-rect_data <- data.frame(
-  xmin = c(4, 13, 5, 20, 6,
-           23.1, 114.5, 45.3,
-           20.1, 73, 48.6),
-  
-  xmax = c(7, 80, 10, 80, 9,
-           39, 195.1, 61.8,
-           52.4, 203.8, 64.7),
-  
-  ymin = c(-27, -30, -24, -17, -24.5,
-           -31.6, -28.7, -27.4,
-           -32.2, -28.5, -24.6),
-  
-  ymax = c(-12, -21, -18, 0, -16,
-           -28.5, -24.6, -26.6,
-           -29.8, -25.2, -24.5),
-  
-  zone = c("Microbial", "C3 plants", "Marine POC", "C4 plants", "Marine Algae",
-           "Extra1", "Extra2", "Extra3",
-           "Extra4", "Extra5", "Extra6")
-)
-
-ellipse_data <- data.frame(
-  x = c(23.1, 39, 45.3, 61.8, 114.5, 195.1,   # Extra1–3 envelope
-        20.1, 52.4, 48.6, 64.7, 73, 203.8),   # Extra4–6 envelope
-  y = c(-31.6, -28.5, -27.4, -26.6, -28.7, -24.6,
-        -32.2, -29.8, -24.6, -24.5, -28.5, -25.2),
-  group = c(rep("TypeA",6), rep("TypeB",6))
-)
-
-
 ```
 
 
@@ -203,26 +172,13 @@ Sed_Org_Guanica <- ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color =
   geom_point(size = 2.5, na.rm = TRUE) +
   scale_color_manual(values = zone_colors) +
   scale_shape_manual(values = zone_shapes) +
-  # scale_fill_manual(values = c(
-  #   "Microbial" = "#A7C09E",
-  #   "C3 plants" = "#D8AFA1",
-  #   "Marine POC" = "#D9C8B0",
-  #   "C4 plants" = "#BAAED1",
-  #   "Marine Algae" = "lightblue"
-  # )) +
-  scale_fill_manual(values = c(
-  "Microbial" = "#A7C09E",
-  "C3 plants" = "#D8AFA1",
-  "Marine POC" = "#D9C8B0",
-  "C4 plants" = "#BAAED1",
-  "Marine Algae" = "lightblue",
-  "Extra1" = "gray",
-  "Extra2" = "gray",
-  "Extra3" = "gray",
-  "Extra4" = "red",
-  "Extra5" = "red",
-  "Extra6" = "red"
-)) +
+   scale_fill_manual(values = c(
+     "Microbial" = "#A7C09E",
+     "C3 plants" = "#D8AFA1",
+     "Marine POC" = "#D9C8B0",
+     "C4 plants" = "#BAAED1",
+     "Marine Algae" = "lightblue"
+   )) +
   
  geom_polygon(
   data = ellipse_df,
@@ -267,26 +223,13 @@ Sed_Org_Guanica <-  ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color 
   geom_point(size = 2.5, na.rm = T) +
   scale_color_manual(values = zone_colors) +
   scale_shape_manual(values = zone_shapes) +
-  # scale_fill_manual(values = c(
-  #   "Microbial" = "#A7C09E",
-  #   "C3 plants" = "#D8AFA1",
-  #   "Marine POC" = "#D9C8B0",
-  #   "C4 plants" = "#BAAED1",
-  #   "Marine Algae" = "lightblue"
-  # )) +
-    scale_fill_manual(values = c(
-  "Microbial" = "#A7C09E",
-  "C3 plants" = "#D8AFA1",
-  "Marine POC" = "#D9C8B0",
-  "C4 plants" = "#BAAED1",
-  "Marine Algae" = "lightblue",
-  "Extra1" = "gray",
-  "Extra2" = "gray",
-  "Extra3" = "gray",
-  "Extra4" = "red",
-  "Extra5" = "red",
-  "Extra6" = "red"
-)) +
+   scale_fill_manual(values = c(
+     "Microbial" = "#A7C09E",
+     "C3 plants" = "#D8AFA1",
+     "Marine POC" = "#D9C8B0",
+     "C4 plants" = "#BAAED1",
+     "Marine Algae" = "lightblue"
+   )) +
   geom_point(size = 2.5, na.rm = T) +
   scale_color_manual(values = zone_colors) +
   scale_shape_manual(values = zone_shapes) +
