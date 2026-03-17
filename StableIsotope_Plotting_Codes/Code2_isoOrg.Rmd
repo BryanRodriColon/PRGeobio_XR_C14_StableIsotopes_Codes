@@ -179,13 +179,13 @@ Khan, N. S., et al. (2019). The application of δ¹³C, TOC and C/N geochemistry
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/StableIsotope_Plotting_Codes')
+#setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XRD_Isotopes_Codes/StableIsotope_Plotting_Codes')
 
 ```
 
 
 
-```{r packages, include = F, echo = FALSE}
+```{r packages, include = T, message = F}
 library(ggplot2)      # Core plotting library for generating static figures
 library(RColorBrewer) # Provides color palettes used for stratigraphic grouping
 library(dplyr)        # Data manipulation and transformation (e.g., mutate, filtering)

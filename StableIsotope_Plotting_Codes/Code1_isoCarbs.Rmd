@@ -149,13 +149,13 @@ Running the script will generate all figures in the `plots/` directory.
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())
-setwd("~/OneDrive - University of Kansas/Bryan-MS_PhD/PHD-PROJECT/PuertoRico/CHAPTER3/Isotopes/R_plotting")
+#setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XR_C14_StableIsotopes_Codes/StableIsotope_Plotting_Codes')
 
 ```
 
 
 
-```{r packages, include = F, echo = FALSE}
+```{r packages, include = T, message = F}
 library(ggplot2)      # Core plotting library for generating static figures
 library(RColorBrewer) # Provides color palettes used for stratigraphic grouping
 library(dplyr)        # Data manipulation and transformation (e.g., mutate, filtering)
