@@ -1,6 +1,6 @@
 ---
 title: 'Code 1: isoCarbs'
-author: "Bryan Rodriguez"
+author: "Bryan Rodriguez-Colon"
 date: "2025-03-23"
 output: html_document
 ---
@@ -323,6 +323,17 @@ print("Plot ready to be modified on Illustrator")
 
 ### Interactive Plot
 
+An interactive version is generated using `plotly`.
+
+This version allows exploration of individual data points, including:
+
+- depth information  
+- sample grouping  
+- geochemical values
+- Main minerology
+
+It is intended for exploratory analysis and is exported as a standalone HTML file.
+
 ```{r Make interactive plot}
 
 Interactive_Sed_Carbs_Guanica <- ggplot(Guanica_CarbData, aes(x = d18O, y = d13C, color = Identifier_3, shape = Identifier_3, text =Identifier_2, label = Mineralogy)) +
@@ -353,7 +364,17 @@ print("Interactive plot ready for inspection")
 
 ```
 
-# Saving Plots
+## Output export
+
+Figures are exported in multiple formats:
+
+- **HTML**: interactive visualization  
+- **SVG**: vector format for editing in Adobe Illustrator  
+- **TIFF**: high-resolution format for journal submission  
+
+All outputs are saved in the `plots/` directory.
+
+Final formatting adjustments may be performed in Illustrator without altering data positions or underlying values.
 
 ```{r Saving Plots}
 

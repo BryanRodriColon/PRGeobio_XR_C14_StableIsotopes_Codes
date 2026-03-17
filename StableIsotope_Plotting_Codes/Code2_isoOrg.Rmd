@@ -1,12 +1,180 @@
 ---
-title: 'Isotope Code 2: Organic Carbon and N (Puerto Rico)'
-author: "Bryan Rodriguez"
+title: 'Code 2: isoOrg'
+author: "Bryan Rodriguez-Colon"
 date: "2025-03-24"
 output: html_document
 ---
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
+
+
+# Overview
+
+This script processes and visualizes organic geochemical data (δ¹³C<sub>org</sub> and TOC/TN ratios) from sediment cores and microbialite samples collected in the Guánica coastal lagoon system, southwestern Puerto Rico.
+
+The script generates both static and interactive crossplots used in the associated *Sedimentology* manuscript to interpret organic matter sources and paleoenvironmental conditions.
+
+In addition, statistical comparisons are performed to evaluate the geochemical distinctiveness of overwash deposits.
 
 
 
+## Associated manuscript
+
+Rodríguez-Colón, B. J., et al. (2026)  
+*Paleoenvironmental and Regional Controls on Microbialite Development and Distribution in a Coastal Lagoon of Southwestern Puerto Rico*  
+Sedimentology
+
+
+## Input data
+
+The script reads organic geochemical data from: `InputData/Org_isotope_Guanica_data.csv`
+
+
+The dataset includes:
+
+- δ¹³C<sub>org</sub> (‰ VPDB)  
+- Total organic carbon (TOC)  
+- Total nitrogen (TN)  
+- TOC/TN ratios  
+- Sample depth and stratigraphic identifiers  
+
+Rows with missing nitrogen or δ¹⁵N values are removed to ensure consistency in geochemical interpretation.
+
+---
+
+## Statistical analysis
+
+A two-sample t-test is performed to evaluate whether the overwash deposit layer (ZC3C) is geochemically distinct from other stratigraphic intervals.
+
+Comparisons include:
+
+- TOC/TN ratios  
+- δ¹³C<sub>org</sub> values  
+
+This analysis provides a quantitative assessment of whether the overwash event represents a statistically distinct organic matter source or depositional regime.
+
+---
+
+## Plot structure
+
+The primary plot displays:
+
+**X-axis**  
+TOC/TN ratio
+
+**Y-axis**  
+δ¹³C<sub>org</sub> (‰ VPDB)
+
+This crossplot is widely used to infer organic matter sources, including:
+
+- terrestrial C₃ plants  
+- terrestrial C₄ plants  
+- marine organic matter  
+- microbial biomass  
+
+(Lamb et al., 2006).
+
+---
+
+## Environmental interpretation fields
+
+### Rectangular regions (Lamb et al., 2006)
+
+Rectangular fields are defined to represent generalized organic matter sources:
+
+- C₃ plants  
+- C₄ plants  
+- marine particulate organic carbon (POC)  
+- microbial sources  
+- marine algae  
+
+These fields provide a first-order framework for interpreting organic matter provenance.
+
+### Elliptical regions (Khan et al., 2019)
+
+Elliptical regions are added to represent mangrove-specific endmembers:
+
+- **Black mangroves (Avicennia germinans)**  
+- **Red mangroves (Rhizophora mangle)**  
+
+These regions are constructed with data from:
+
+Khan et al. (2019), Marine Geology 415
+
+and provide a more regionally constrained interpretation of mangrove-derived organic matter in Puerto Rico.
+
+---
+
+## Grouping and visualization
+
+Samples are grouped using:`Identifier_5`
+
+Each group is assigned:
+
+- a unique color  
+- a unique symbol  
+
+Microbialite samples are explicitly highlighted to distinguish them from sediment core intervals.
+
+
+
+## Outputs
+
+### 1. Static publication plot
+
+Object:`Sed_Org_Guanica`
+
+Exported as:
+
+- SVG (for Illustrator editing)  
+- TIFF (high-resolution for publication)  
+
+This figure is used in the *Sedimentology* manuscript.
+
+
+### 2. Interactive plot
+
+Object:`Interactive_Sed_Org_Guanica`
+
+
+This version allows exploration of:
+
+- depth information  
+- sample grouping  
+- geochemical values  
+
+Exported as:`plots/Interactive_Sed_Org_Guanica.html`
+
+
+---
+
+## Reproducibility
+
+Expected folder structure:
+`StableIsotope_Plotting_Codes/`
+`InputData/`
+`Org_isotope_Guanica_data.csv`
+`plots/`
+
+
+Running the script will generate all outputs in the `plots/` directory.
+
+
+## Notes
+
+- All file paths are relative to the project directory  
+- Missing values are removed prior to analysis to ensure data consistency  
+- Color and symbol assignments are fixed for reproducibility  
+- Environmental interpretation fields (rectangles and ellipses) are based on published frameworks and are used for visualization only  
+- Final figure formatting may be refined in Adobe Illustrator; these edits do not modify data positions or values  
+
+
+## References
+
+Lamb, A. L., Wilson, G. P., & Leng, M. J. (2006). A review of coastal palaeoclimate and relative sea-level reconstructions using δ¹³C and C/N ratios in organic material. *Earth-Science Reviews*, 75, 29–57.
+
+Khan, N. S., et al. (2019). The application of δ¹³C, TOC and C/N geochemistry of mangrove sediments to reconstruct Holocene paleoenvironments and relative sea levels, Puerto Rico. *Marine Geology*, 415.
+
+# Script Set Up, Library calling and loading data
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -18,29 +186,24 @@ setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PR
 
 
 ```{r packages, include = F, echo = FALSE}
-library(ggplot2)
-library(ggsci)
-library(RColorBrewer)
-library(plotly)
-library(dplyr)
-library(tibble)
-library(purrr)
-library(ggpubr)
-library(lubridate)
-library(patchwork)
-library(readxl)
-library(viridis)
-library(RColorBrewer)
-library(openintro)
-library(ggdist)
-library(htmlwidgets)
-library(sf)
-library(ggspatial)
-library(tidypaleo)
-library(colorspace)
+library(ggplot2)      # Core plotting library for generating static figures
+library(RColorBrewer) # Provides color palettes used for stratigraphic grouping
+library(dplyr)        # Data manipulation and transformation (e.g., mutate, filtering)
+library(plotly)       # Converts ggplot objects into interactive visualizations
+library(htmlwidgets)  # Enables saving interactive plots as standalone HTML files
 ```
 
-# Load data
+## Data import and preprocessing
+
+Organic carbon and nitrogen data are imported from: `InputData/Org_isotope_Guanica_data.csv`
+
+
+This dataset includes δ¹³Corg, TOC, TN, TOC/TN ratios, and associated metadata (e.g., depth and stratigraphic identifiers).
+
+The column `DepthCore_m` is explicitly converted to numeric format to ensure compatibility with plotting and statistical analysis.
+
+Rows containing missing values (e.g., low nitrogen concentrations or absent δ¹⁵N measurements) are removed to maintain consistency in geochemical interpretation.
+
 
 
 ```{r Load Organic Carbon and Nitrogen Data, echo = F}
@@ -58,7 +221,18 @@ rm(IntergerColumns)
 
 # Statistics
 
-The code below will perform a t-test on ZC3C (overwash layers), to make a comparision with the other layers and see how their difference have any statistical relevance. Thanks to Dr. amtthew Allen for the idea. 
+## Statistical analysis
+
+This section evaluates whether the putative overwash layers (ZC3C) is geochemically distinct from other stratigraphic intervals.
+
+A two-sample t-test is performed comparing:
+
+- TOC/TN ratios  
+- δ¹³Corg values  
+
+between ZC3C samples and all remaining samples.
+
+This analysis provides a quantitative assessment of differences in organic matter sources associated with the overwash events, if any. Thank you to Dr. Matthew Allen for the suggestion
 
 ```{r Statistical Significance test on Overswash event}
 #subset the zone
@@ -82,7 +256,20 @@ t.test(ZC3C_Layer$d13C_org, everyting_else$d13C_org)
 
 # Plotting
 
-```{r}
+## Defined variables for plotting
+
+### Mangrove reference fields (Khan et al., 2019)
+
+Elliptical regions are defined to represent the isotopic and C/N ranges of mangrove-derived organic matter.
+
+These fields correspond to:
+
+- Black mangroves (*Avicennia germinans*)  
+- Red mangroves (*Rhizophora mangle*)  
+
+The ellipse geometry is constructed manually to approximate the ranges reported in Khan et al. (2019), providing a regional framework for interpreting mangrove contributions to sediment organic matter.
+
+```{r Designing the ellipse regions}
 ellipse_points <- function(cx, cy, rx, ry, n = 200){
   t <- seq(0, 2*pi, length.out = n)
   data.frame(
@@ -97,7 +284,7 @@ ellipse_A <- ellipse_points(
   rx = 20,     # horizontal radius
   ry = 2
 )
-ellipse_A$type <- "TypeA"
+ellipse_A$type <- "BlackMangroves"
 
 ellipse_B <- ellipse_points(
   cx = 60,
@@ -105,15 +292,36 @@ ellipse_B <- ellipse_points(
   rx = 18,
   ry = 1.5
 )
-ellipse_B$type <- "TypeB"
+ellipse_B$type <- "RedMangroves"
 
-ellipse_df <- rbind(ellipse_A, ellipse_B)
+ellipse_df <- rbind(ellipse_A, ellipse_B) #Regions for the mangroves as shown in Khan et al., 2019 Red and black mangroves
 
 
 ```
 
 
+### Plot styling and grouping scheme
 
+Samples are grouped using the `Identifier_5` field, with each group assigned a unique color and symbol.
+
+- C2 and C3 zones are represented using blue and orange palettes, respectively  
+- Microbialite samples are highlighted separately  
+
+Color and shape assignments are explicitly defined to ensure consistent visualization across plots and reproducibility between runs.
+
+#### Environmental interpretation fields (Lamb et al., 2006)
+
+Rectangular regions are defined to represent generalized organic matter sources based on δ¹³Corg and TOC/TN values.
+
+These include:
+
+- C₃ plants  
+- C₄ plants  
+- marine particulate organic carbon (POC)  
+- microbial sources  
+- marine algae  
+
+These fields follow the framework described in Lamb et al. (2006) and provide a first-order interpretation of organic matter provenance.
 
 
 ```{r Defined variables for plotting}
@@ -157,6 +365,15 @@ rect_data <- data.frame(
 
 ```
 
+## Plotting
+
+### Static isotope crossplot
+
+This section generates the primary δ¹³Corg vs TOC/TN crossplot used in the manuscript.
+
+Samples are plotted using predefined color and shape schemes, with environmental interpretation fields (rectangles and ellipses) overlaid for context.
+
+The plot is formatted for publication, including axis limits, labeled units (VPDB), and minimal styling for clarity and post-processing in Illustrator.
 
 ```{r Plot for paper and for Illustrator}
 
@@ -177,7 +394,9 @@ Sed_Org_Guanica <- ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color =
      "C3 plants" = "#D8AFA1",
      "Marine POC" = "#D9C8B0",
      "C4 plants" = "#BAAED1",
-     "Marine Algae" = "lightblue"
+     "Marine Algae" = "lightblue",
+     "BlackMangroves" = "black",
+     "RedMangroves" = "red"
    )) +
   
  geom_polygon(
@@ -196,7 +415,7 @@ Sed_Org_Guanica <- ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color =
   ggtitle(expression(paste(delta^{13}, C[phantom(0)][org], " ", "and", " ", C[phantom(0)][org],"/",N[phantom(0)][total], " ", "Values of sediment cores and microbialites in Laguna Providencia and Montalva, Guánica, PR" ))) +
   theme_minimal() + # Uses a minimal theme for aesthetics
 
-theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.15, size = 16, face = "bold"), plot.background =   element_rect(fill = "white"), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), panel.grid = element_blank(), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.3, size = 9, face = "bold"), plot.background =   element_rect(fill = "white"), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), panel.grid = element_blank(), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
   
 scale_x_continuous(breaks = seq(0, 70, by = 5)) + # Labels at every 1 interval
 scale_y_continuous(breaks = seq(-28, -10, by = 2)) + # Labels at every 1 interval
@@ -210,6 +429,18 @@ Sed_Org_Guanica
 print("Plot ready to be modified on Illustrator")
 
 ```
+
+## Interactive plot
+
+An interactive version of the δ¹³Corg vs TOC/TN plot is generated using `plotly`.
+
+This version allows exploration of individual data points, including:
+
+- depth information  
+- sample grouping  
+- geochemical values  
+
+It is intended for exploratory analysis and is exported as a standalone HTML file.
 
 ```{r Make interactive plot}
 
@@ -228,16 +459,27 @@ Sed_Org_Guanica <-  ggplot(Guanica_OrgData, aes(x = TOC_TN, y = d13C_org, color 
      "C3 plants" = "#D8AFA1",
      "Marine POC" = "#D9C8B0",
      "C4 plants" = "#BAAED1",
-     "Marine Algae" = "lightblue"
+     "Marine Algae" = "lightblue",
+     "BlackMangroves" = "black",
+     "RedMangroves" = "red"
    )) +
+  
+   geom_polygon(
+  data = ellipse_df,
+  aes(x = x, y = y, group = type, fill = type),
+  alpha = 0.15,
+  color = NA,
+  inherit.aes = FALSE
+) +
+  
   geom_point(size = 2.5, na.rm = T) +
   scale_color_manual(values = zone_colors) +
   scale_shape_manual(values = zone_shapes) +
   ylab("d13Corg") +  # Set y-axis label
   xlab("TOC/TN") +
-  ggtitle("Corg and TOC/TN biplot" ) +
+  ggtitle("Corg and TOC/TN Values of sediment cores and microbialites in Laguna Providencia and Montalva, Guánica, PR" ) +
   theme_minimal() +
-   theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0.3, size = 18), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
+   theme(legend.position = "right", legend.key.size = unit(0.5, "cm"), legend.title = element_text(hjust = 0.5, size = 12),  legend.text = element_text(hjust = 0.5), plot.title = element_text(hjust = 0, size = 10), axis.title.x = element_text(size = 14), axis.title.y = element_text(size = 14), plot.background =   element_rect(fill = "white"), panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5)) +
   scale_x_continuous(breaks = seq(0, 70, by = 5)) + # Labels at every 1 interval
 scale_y_continuous(breaks = seq(-28, -10, by = 2)) + # Labels at every 1 interval
 coord_cartesian(xlim = c(0, 70), ylim = c(-28, -10)) +
@@ -255,7 +497,17 @@ Interactive_Sed_Org_Guanica
 
 ```
 
+## Output export
 
+Figures are exported in multiple formats:
+
+- **HTML**: interactive visualization  
+- **SVG**: vector format for editing in Adobe Illustrator  
+- **TIFF**: high-resolution format for journal submission  
+
+All outputs are saved in the `plots/` directory.
+
+Final formatting adjustments may be performed in Illustrator without altering data positions or underlying values.
 
 ```{r Save plots}
 
