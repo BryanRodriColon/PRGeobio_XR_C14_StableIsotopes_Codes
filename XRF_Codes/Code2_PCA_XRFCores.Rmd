@@ -164,7 +164,7 @@ Stop data displayed in scientific notation
 options(scipen = 999)
 ```
 
-```{r load packages, warning=FALSE}
+```{r load packages, warning=FALSE, message = F}
 
 library(ggplot2)      # plotting (all figures)
 library(dplyr)        # data manipulation (select, filter, pipes)
@@ -569,26 +569,26 @@ Intermediate objects and large datasets are removed after export to:
 ```{r Save Figures and data for C2}
 
 #Saving PCA plots
-ggsave("plots/C2/pca_biplot_cor_C2.svg", pca_biplot_cor_C2, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C2/pca_biplot_cor_C2.tiff", pca_biplot_cor_C2, width = 6, height = 6, dpi = 300)
-ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.svg", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C2/pcaC2_biplot_facies_facets_C2.tiff", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, dpi = 300)
+ggsave("plots/pca_biplot_cor_C2.svg", pca_biplot_cor_C2, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pca_biplot_cor_C2.tiff", pca_biplot_cor_C2, width = 6, height = 6, dpi = 300)
+ggsave("plots/pcaC2_biplot_facies_facets_C2.svg", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pcaC2_biplot_facies_facets_C2.tiff", pcaC2_biplot_facies_facets_C2, width = 6, height = 6, dpi = 300)
 
-ggsave("plots/C2/pcaC2_biplot_facies.svg", pcaC2_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pcaC2_biplot_facies.svg", pcaC2_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
 
 
 #Save barplot
-ggsave("plots/C2/barplot_C2.svg", barplot_C2, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/barplot_C2.svg", barplot_C2, width = 6, height = 6, units = "in", device = "svg")
 
 
 #Save CLR and PCA scores for MATLAB plotting (I will use this for downcore plotting, which is the code in MATLAB that is not here)
-write.csv(clr_data_C2, file = "outputFiles/C2/clr_data_C2.csv", row.names = FALSE)
-write.csv(scores_C2, file = "outputFiles/C2/PCA_data_C2.csv", row.names = FALSE)
-write.csv(explained_variance_perc_C2, file = "outputFiles/C2/C2_Variance_Perc.csv", row.names = FALSE)
+write.csv(clr_data_C2, file = "outputFiles/clr_data_C2.csv", row.names = FALSE)
+write.csv(scores_C2, file = "outputFiles/PCA_data_C2.csv", row.names = FALSE)
+write.csv(explained_variance_perc_C2, file = "outputFiles/C2_Variance_Perc.csv", row.names = FALSE)
 
 #Save correlation Matrix as a CSV file
 
-write.csv(cor_matrix_C2, file = "outputFiles/C2/correlation_matrix_C2.csv", row.names = T)
+write.csv(cor_matrix_C2, file = "outputFiles/correlation_matrix_C2.csv", row.names = T)
 
 rm(pca_biplot_cor_C2)
 rm(pcaC2_biplot_facies_facets_C2)
@@ -768,26 +768,26 @@ names(explained_variance_perc_C3) <- colnames(cor_matrix_C3)
 ```{r Save Figures and data for C3}
 
 #Saving PCA plots
-ggsave("plots/C3/pca_biplot_cor_C3.svg", pca_biplot_cor_C3, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C3/pca_biplot_cor_C3.tiff", pca_biplot_cor_C3, width = 6, height = 6, dpi = 300)
-ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.svg", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, units = "in", device = "svg")
-ggsave("plots/C3/pcaC2_biplot_facies_facets_C3.tiff", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, dpi = 300)
+ggsave("plots/pca_biplot_cor_C3.svg", pca_biplot_cor_C3, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pca_biplot_cor_C3.tiff", pca_biplot_cor_C3, width = 6, height = 6, dpi = 300)
+ggsave("plots/pcaC2_biplot_facies_facets_C3.svg", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pcaC2_biplot_facies_facets_C3.tiff", pcaC2_biplot_facies_facets_C3, width = 6, height = 6, dpi = 300)
 
-ggsave("plots/C3/pcaC3_biplot_facies.svg", pcaC3_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/pcaC3_biplot_facies.svg", pcaC3_biplot_facies, width = 6, height = 6, units = "in", device = "svg")
 
 
 #Save barplot
-ggsave("plots/C3/barplot_C3.svg", barplot_C3, width = 6, height = 6, units = "in", device = "svg")
+ggsave("plots/barplot_C3.svg", barplot_C3, width = 6, height = 6, units = "in", device = "svg")
 
 
 #Save CLR and PCA scores for MATLAB plotting (I will use this for downcore plotting, which is the code in MATLAB that is not here)
-write.csv(clr_data_C3, file = "outputFiles/C3/clr_data_C3.csv", row.names = FALSE)
-write.csv(scores_C3, file = "outputFiles/C3/PCA_data_C3.csv", row.names = FALSE)
-write.csv(explained_variance_perc_C3, file = "outputFiles/C3/C3_Variance_Perc.csv", row.names = FALSE)
+write.csv(clr_data_C3, file = "outputFiles/clr_data_C3.csv", row.names = FALSE)
+write.csv(scores_C3, file = "outputFiles/PCA_data_C3.csv", row.names = FALSE)
+write.csv(explained_variance_perc_C3, file = "outputFiles/C3_Variance_Perc.csv", row.names = FALSE)
 
 #Save correlation Matrix as a CSV file
 
-write.csv(cor_matrix_C3, file = "outputFiles/C3/correlation_matrix_C3.csv", row.names = T)
+write.csv(cor_matrix_C3, file = "outputFiles/correlation_matrix_C3.csv", row.names = T)
 
 
 ```
