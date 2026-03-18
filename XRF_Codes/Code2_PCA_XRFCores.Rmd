@@ -1,6 +1,6 @@
 ---
 title: 'Code2: XRD PCA Analysis'
-author: "Bryan Rodriguez"
+author: "Bryan Rodriguez-Colon"
 date: "2026-03-17"
 output: html_document
 ---
