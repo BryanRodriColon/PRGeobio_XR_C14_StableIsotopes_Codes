@@ -7,6 +7,148 @@ output: html_document
 
 ***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
 
+# Code2_PCA_XRFcores
+
+## Overview
+
+This script performs Principal Component Analysis (PCA) on clr-transformed XRF elemental datasets from sediment cores C2 and C3. The goal is to identify dominant geochemical gradients, evaluate compositional variability, and interpret these patterns within a stratigraphic (facies-based) framework.
+
+This script operates on preprocessed data generated in **Code1_clr_XRFcores**, ensuring a modular workflow where data transformation and statistical analysis are separated.
+
+## Objectives
+
+1. Load clr-transformed datasets  
+2. Perform PCA on compositional geochemical data  
+3. Visualize sample distributions and elemental controls  
+4. Quantify variance structure  
+5. Export figures and processed data for interpretation and external workflows  
+
+## Workflow structure
+
+### 1. Data loading
+
+clr-transformed datasets (`clr_data_C2`, `clr_data_C3`) are imported from a saved `.RData` file. These datasets already:
+
+- Contain filtered elements  
+- Are free of zeros and missing values  
+- Include depth information  
+
+### 2. Data preparation
+
+Prior to PCA:
+
+- Non-compositional variables (e.g., `Depth`) are removed  
+- Elements interpreted as analytical or post-processing artifacts (e.g., `K`, `Cl`) are excluded  
+
+This ensures that PCA is performed only on geochemically meaningful clr-transformed variables.
+
+### 3. PCA computation
+
+PCA is performed using the `prcomp()` function with:
+
+- **Centering** (mean subtraction)  
+- **Scaling** (unit variance standardization)  
+
+This approach ensures that all variables contribute equally, independent of their variance or magnitude.
+
+### 4. PCA outputs
+
+For each core:
+
+- **Scores (PC1, PC2)**: represent sample positions in reduced-dimensional space  
+- **Loadings**: represent the contribution of each element to the principal components  
+
+Depth information is reattached to scores for stratigraphic interpretation.
+
+### 5. Stratigraphic (facies) classification
+
+Samples are grouped into facies based on depth intervals to contextualize PCA results.
+
+#### Core C2 facies
+
+- ZC2A: 0–30 cm  
+- ZC2B: 30–48 cm  
+- ZC2C: 48–60 cm  
+- ZC2D: 60–107 cm  
+- ZC2E: 107–116 cm  
+
+#### Core C3 facies
+
+- ZC3A: 0–15 cm  
+- ZC3B: 15–38 cm  
+- ZC3C: 38–53.6 cm  
+- ZC3D: 53.6–94 cm  
+
+These facies divisions allow interpretation of geochemical variability in a stratigraphic and paleoenvironmental context.
+
+### 6. Visualization
+
+Several types of plots are generated:
+
+#### PCA score plots
+- PC1 vs PC2 scatter plots  
+- Colored by facies  
+- Used to identify clustering and trends  
+
+#### Faceted PCA plots
+- Separate panels per facies  
+- Highlight intra-facies variability  
+
+#### Interactive plots
+- Generated using `plotly`  
+- Allow exploration of sample-level metadata (e.g., depth)  
+
+#### Loadings (correlation biplots)
+- Display eigenvectors only  
+- Show relationships among elements  
+- Axes fixed to [-1, 1] for interpretability  
+
+#### Scree plots
+- Show percentage of variance explained per component  
+- Used to assess dimensionality  
+
+### 7. Variance and correlation analysis
+
+- Explained variance is calculated from PCA eigenvalues  
+- A correlation matrix of loadings is generated to quantify relationships among elements  
+
+These outputs support interpretation of geochemical controls and element associations.
+
+### 8. Data and figure export
+
+Outputs are saved for reproducibility and integration with external workflows:
+
+#### Figures
+- PCA plots (SVG and TIFF formats)  
+- Scree plots  
+
+#### Data
+- PCA scores  
+- clr-transformed datasets  
+- Explained variance  
+- Loadings correlation matrices  
+
+These outputs are used for further visualization (e.g., MATLAB-based downcore plots) and publication figures.
+
+### 9. Workspace management
+
+Intermediate variables and large objects are removed after export to:
+
+- Optimize memory usage  
+- Avoid object conflicts  
+- Maintain a clean analytical environment  
+
+## Notes
+
+- PCA is performed on clr-transformed data to respect compositional data structure (Aitchison, 1986)  
+- Element selection and prior filtering strongly influence PCA results  
+- Consistent preprocessing across cores ensures comparability  
+- Interpretation should integrate stratigraphy, mineralogy, and depositional context  
+
+## Reference
+
+Aitchison, J. (1986). *The Statistical Analysis of Compositional Data*. Chapman & Hall.
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -37,8 +179,69 @@ library(plotly)       # interactive plots
 ```
 
 
+```{r}
+load("RData/clr_XRF_cores.RData")
+```
 
-#C2 Analysis
+# Core C2
+
+## Principal Component Analysis (PCA) – Core C2
+
+Principal Component Analysis (PCA) is applied to the clr-transformed dataset of Core C2 to identify dominant geochemical gradients and evaluate compositional variability across stratigraphic intervals.
+
+### Data preparation
+
+Prior to PCA, the dataset is subset to exclude:
+
+- `Depth` (non-compositional variable)  
+- `K` and `Cl`, which are interpreted as potential artifacts related to drying or salt precipitation processes rather than primary depositional signals  
+
+This step ensures that PCA is performed only on geochemically meaningful clr-transformed variables.
+
+### PCA implementation
+
+PCA is performed using the `prcomp()` function with:
+
+- **Centering**: mean subtraction for each variable  
+- **Scaling**: standardization to unit variance  
+
+This approach ensures that all elements contribute equally to the analysis regardless of differences in variance or absolute magnitude.
+
+### PCA scores
+
+The first two principal components (PC1 and PC2) are extracted to represent the dominant axes of variance in the dataset.
+
+- These scores correspond to sample positions in reduced-dimensional space  
+- They are used for visualization and interpretation of geochemical trends  
+
+Depth information is reattached to the PCA scores to preserve stratigraphic context.
+
+### Facies classification
+
+Samples are grouped into stratigraphic facies based on depth intervals (from base to top):
+
+- ZC2A: 0–30 cm  
+- ZC2B: 30–48 cm  
+- ZC2C: 48–60 cm  
+- ZC2D: 60–107 cm  
+- ZC2E: 107–116 cm  
+
+This classification enables interpretation of PCA results in terms of depositional units and vertical (stratigraphic) geochemical transitions.
+
+### Loadings
+
+PCA loadings (eigenvectors) are extracted and scaled by the standard deviation of each principal component. This produces coordinates compatible with score space for biplot visualization.
+
+- Loadings represent the contribution of each element to the principal components  
+- High absolute values indicate strong influence on the corresponding axis  
+
+### Notes
+
+- Optional scaling of loadings to match score magnitude is included but not applied by default  
+- The interpretation of PCA results depends on the clr-transformed variable set and prior filtering decisions  
+- Removing variables (e.g., K, Cl) changes the compositional basis and should be consistently documented  
+
+Temporary subset data is removed after PCA to maintain a clean workspace.
 
 ```{r PCA C2}
 
@@ -83,7 +286,43 @@ rm(subset_data_C2)
 
 ```
 
-```{r Plot C2 Individual Factor Map (OPTIONAL)}
+## PCA visualization – Core C2
+
+### PCA biplot (scores only)
+
+The PCA results for Core C2 are visualized using a scatter plot of the first two principal components (PC1 vs PC2), representing the dominant axes of geochemical variability.
+
+- Each point corresponds to a sample  
+- Points are colored by stratigraphic facies  
+- Transparency (`alpha = 0.7`) is applied to reduce overplotting  
+
+Depth information is included as an interactive tooltip variable, enabling direct inspection of stratigraphic position in the interactive version of the plot.
+
+### Interactive visualization
+
+An interactive version of the PCA plot is generated using `plotly`:
+
+- Allows exploration of individual samples  
+- Displays PC coordinates, facies, and depth on hover  
+- Facilitates identification of trends, clusters, and outliers  
+
+This is particularly useful for exploratory data analysis and validation of facies groupings.
+
+### Faceted PCA plots
+
+To better visualize intra-facies variability, the PCA scores are also plotted using faceting:
+
+- Each panel represents a single facies  
+- Enables comparison of variance structure within and between facies  
+- Helps identify whether geochemical variability is facies-dependent or continuous across depth  
+
+### Notes
+
+- These plots display only PCA scores (samples), not loadings  
+- Interpretation should consider both clustering patterns and stratigraphic ordering  
+- Faceting can highlight subtle differences that may not be apparent in the combined plot  
+
+```{r Plot C2 Individual Factor Map, echo =F}
 
 # --- Create the PCA Biplot (Individual Factor Map) ---
 pcaC2_biplot_facies <- ggplot() +
@@ -97,7 +336,51 @@ pcaC2_biplot_facies <- ggplot() +
 print(pcaC2_biplot_facies)
 
 interactive_plot_PCA_C2 <- ggplotly(pcaC2_biplot_facies, tooltip = c("x", "y", "color", "text"))
+interactive_plot_PCA_C2
+
+# This is to make each zone separate in facets
+pcaC2_biplot_facies_facets_C2 <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
+  facet_wrap(~ Facies) +
+  theme_minimal() +
+  labs(title = "PCA Biplot Faceted by Facies for Core C2",
+       x = "PC1", y = "PC2", color = "Facies")
+
+pcaC2_biplot_facies_facets_C2
 ```
+
+## PCA loadings visualization (correlation biplot) – Core C2
+
+To evaluate the contribution of individual elements to the principal components, a correlation biplot is generated using PCA loadings (eigenvectors) only.
+
+### Representation
+
+- Each vector represents an elemental variable  
+- Vector direction indicates the relationship with PC1 and PC2  
+- Vector length reflects the strength of the contribution to the principal components  
+
+Elements pointing in similar directions are positively correlated, whereas elements pointing in opposite directions are negatively correlated.
+
+### Scaling and axes
+
+- Loadings are plotted within a fixed coordinate system ranging from −1 to 1 on both axes  
+- This standardization facilitates interpretation as a correlation structure between variables and principal components  
+
+### Labeling
+
+Element names are displayed using repelled text labels to improve readability and avoid overlap, allowing clear identification of geochemical drivers.
+
+### Interpretation
+
+- Elements with long vectors exert strong control on the variance captured by PC1 and PC2  
+- Clusters of vectors indicate groups of elements with similar geochemical behavior  
+- Orthogonal relationships suggest independence between variables  
+
+### Notes
+
+- This plot excludes sample scores to focus exclusively on variable relationships  
+- It complements the PCA score plots by providing mechanistic insight into the geochemical gradients identified  
 
 ```{r Plot C2 only the eigenvectors without the scores}
 
@@ -121,18 +404,6 @@ print(pca_biplot_cor_C2)
 
 ```
 
-```{r plot C2 PCA in facets without loadings}
-pcaC2_biplot_facies_facets_C2 <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C2, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C2",
-       x = "PC1", y = "PC2", color = "Facies")
-
-pcaC2_biplot_facies_facets_C2
-
-```
 
 ```{r LDA in C2 (OPTIONAL, DO NOT USE)}
 
@@ -175,6 +446,47 @@ print(lda_plot)
 
 ```
 
+## Explained variance and correlation structure – Core C2
+
+### Explained variance
+
+The proportion of variance explained by each principal component is calculated from the eigenvalues of the PCA:
+
+- Eigenvalues are obtained from the squared standard deviations (`sdev²`)  
+- Values are normalized by the total variance to obtain relative contributions  
+- Results are expressed as percentages  
+
+This quantifies how much of the total geochemical variability is captured by each principal component.
+
+### Scree plot
+
+A scree plot is generated to visualize the distribution of explained variance across principal components:
+
+- Each bar represents a principal component  
+- The height corresponds to the percentage of variance explained  
+- This plot aids in determining how many components are meaningful to retain  
+
+Typically, the first few components capture the majority of the variance and are used for interpretation.
+
+### Loadings correlation matrix
+
+A correlation matrix is computed using the PCA loadings:
+
+- Based on the rotation matrix (eigenvectors)  
+- Represents relationships among elemental variables in PCA space  
+
+This matrix provides complementary information to the biplot by:
+
+- Quantifying the degree of association between variables  
+- Identifying groups of elements with similar geochemical behavior  
+- Supporting interpretation of element clustering observed in the loadings plot  
+
+### Notes
+
+- The explained variance structure is essential for assessing dimensionality reduction efficiency  
+- The correlation matrix reflects relationships in transformed (clr) space, not raw counts  
+- Naming consistency between variance and correlation outputs is maintained for clarity in downstream export and interpretation  
+
 ```{r Explained variance and Correlation Matrix for C2}
 # Explained Variance
 explained_variance_C2 <- pca_results_C2$sdev^2 / sum(pca_results_C2$sdev^2)
@@ -203,6 +515,57 @@ names(explained_variance_perc_C2) <- colnames(cor_matrix_C2)
 
 ```
 
+## Export of figures and data – Core C2
+
+### Figure export
+
+PCA visualizations are exported in both vector and raster formats:
+
+- **SVG format**: preserves vector quality for publication and editing (e.g., Illustrator)  
+- **TIFF format (300 dpi)**: suitable for journal submission requirements  
+
+Exported figures include:
+
+- PCA loadings correlation biplot  
+- PCA score plot faceted by facies  
+- PCA score plot (combined facies)  
+- Scree plot (explained variance)  
+
+All figures are saved with standardized dimensions (6 × 6 inches) to ensure consistency across outputs.
+
+### Data export
+
+Processed datasets are exported as `.csv` files to facilitate interoperability with external workflows:
+
+- `clr_data_C2.csv`: clr-transformed elemental dataset  
+- `PCA_data_C2.csv`: PCA scores (PC1, PC2, depth, facies)  
+- `C2_Variance_Perc.csv`: percentage of variance explained per component  
+- `correlation_matrix_C2.csv`: correlation matrix derived from PCA loadings  
+
+The clr and PCA score outputs are specifically intended for downstream visualization and stratigraphic plotting in MATLAB-based workflows.
+
+### Workflow integration
+
+Exporting intermediate and final datasets ensures:
+
+- Reproducibility of results  
+- Flexibility for cross-platform analysis (R ↔ MATLAB)  
+- Efficient separation between statistical analysis and visualization pipelines  
+
+### Workspace cleanup
+
+Intermediate objects and large datasets are removed after export to:
+
+- Reduce memory usage  
+- Prevent object conflicts in subsequent analyses  
+- Maintain a clean working environment  
+
+### Notes
+
+- File paths assume a predefined directory structure (`plots/C2/`, `outputFiles/C2/`)  
+- Users should ensure directories exist prior to execution or implement automated directory creation  
+- Retaining exported `.csv` files allows reproducibility without rerunning PCA computations  
+
 ```{r Save Figures and data for C2}
 
 #Saving PCA plots
@@ -218,7 +581,7 @@ ggsave("plots/C2/pcaC2_biplot_facies.svg", pcaC2_biplot_facies, width = 6, heigh
 ggsave("plots/C2/barplot_C2.svg", barplot_C2, width = 6, height = 6, units = "in", device = "svg")
 
 
-#Save CLR and PCA scores for MATLAB plotting
+#Save CLR and PCA scores for MATLAB plotting (I will use this for downcore plotting, which is the code in MATLAB that is not here)
 write.csv(clr_data_C2, file = "outputFiles/C2/clr_data_C2.csv", row.names = FALSE)
 write.csv(scores_C2, file = "outputFiles/C2/PCA_data_C2.csv", row.names = FALSE)
 write.csv(explained_variance_perc_C2, file = "outputFiles/C2/C2_Variance_Perc.csv", row.names = FALSE)
@@ -241,7 +604,35 @@ rm(barplot_C2)
 
 ```
 
-#C3 Analysis
+# C3 Analysis
+## Principal Component Analysis (PCA) – Core C3
+
+The PCA workflow applied to Core C3 follows the same methodology described for Core C2, including:
+
+- Subsetting clr-transformed data to remove non-compositional or artifact-prone variables  
+- Performing PCA using centered and scaled variables  
+- Extracting PCA scores (PC1 and PC2) and loadings  
+- Visualizing results through score plots, faceted plots, and loadings (correlation biplots)  
+- Calculating explained variance and generating scree plots  
+- Exporting figures and datasets for downstream analysis  
+
+### Facies classification
+
+For Core C3, stratigraphic facies are defined using the following depth intervals:
+
+- ZC3A: 0–15 cm  
+- ZC3B: 15–38 cm  
+- ZC3C: 38–53.6 cm  
+- ZC3D: 53.6–94 cm  
+
+These intervals reflect the vertical structure of the core and are used to interpret PCA results in a stratigraphic and paleoenvironmental context.
+
+### Notes
+
+- All preprocessing, transformation, and visualization steps are identical to those applied to Core C2  
+- Differences between cores arise solely from the selected elements and stratigraphic zoning  
+- Maintaining methodological consistency allows direct comparison of PCA results between cores  
+
 
 ```{r PCA C3}
 
@@ -289,7 +680,7 @@ rm(subset_data_C3)
 
 ```
 
-```{r Plot C3 Individual Factor Map (OPTIONAL)}
+```{r Plot C3 Individual Factor Map}
 
 # --- Create the PCA Biplot (Individual Factor Map) ---
 pcaC3_biplot_facies <- ggplot() +
@@ -303,7 +694,25 @@ pcaC3_biplot_facies <- ggplot() +
 print(pcaC3_biplot_facies)
 
 interactive_plot_PCA_C3 <- ggplotly(pcaC3_biplot_facies, tooltip = c("x", "y", "color", "text"))
+interactive_plot_PCA_C3
+
+#Plot separate as facets
+pcaC2_biplot_facies_facets_C3 <- ggplot() +
+  # Plot sample scores, colored by facies
+  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
+  facet_wrap(~ Facies) +
+  theme_minimal() +
+  labs(title = "PCA Biplot Faceted by Facies for Core C3",
+       x = "PC1", y = "PC2", color = "Facies")
+
+pcaC2_biplot_facies_facets_C3
+
+
+
 ```
+
+
+
 
 ```{r Plot C3 only the eigenvectors without the scores}
 
@@ -327,18 +736,7 @@ print(pca_biplot_cor_C3)
 
 ```
 
-```{r plot C3 PCA in facets without loadings}
-pcaC2_biplot_facies_facets_C3 <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
 
-pcaC2_biplot_facies_facets_C3
-
-```
 
 ```{r Explained variance and Correlation Matrix for C3}
 # Explained Variance
@@ -382,7 +780,7 @@ ggsave("plots/C3/pcaC3_biplot_facies.svg", pcaC3_biplot_facies, width = 6, heigh
 ggsave("plots/C3/barplot_C3.svg", barplot_C3, width = 6, height = 6, units = "in", device = "svg")
 
 
-#Save CLR and PCA scores for MATLAB plotting
+#Save CLR and PCA scores for MATLAB plotting (I will use this for downcore plotting, which is the code in MATLAB that is not here)
 write.csv(clr_data_C3, file = "outputFiles/C3/clr_data_C3.csv", row.names = FALSE)
 write.csv(scores_C3, file = "outputFiles/C3/PCA_data_C3.csv", row.names = FALSE)
 write.csv(explained_variance_perc_C3, file = "outputFiles/C3/C3_Variance_Perc.csv", row.names = FALSE)
@@ -393,139 +791,3 @@ write.csv(cor_matrix_C3, file = "outputFiles/C3/correlation_matrix_C3.csv", row.
 
 
 ```
-
-## C3 analysis by portions.
-
-```{r Carbonate Sediment PCA}
-
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-C3_inorganic_og <- subset(clr_data_C3, Depth >=53.6 & Depth <=94)
-
-C3_inorganic <- C3_inorganic_og %>% select(-c("Depth", "K", "Cl"))
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C3_Peat <- prcomp(C3_inorganic, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
-colnames(scores_C3_Peat) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C3_Peat$Depth <- C3_inorganic_og$Depth  # Replace 'original_data' with your depth data frame
-
-
-# --- Extract and scale Loadings ---
-loadings_C3_Peat <- pca_results_C3_Peat$rotation[, 1:2] * 
-  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
-loadings_C3_Peat <- data.frame(loadings_C3_Peat)
-colnames(loadings_C3_Peat) <- c("PC1", "PC2")
-loadings_C3_Peat$variable <- rownames(loadings_C3_Peat)
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C3_Peat <- ggplot() +
-  geom_segment(data = loadings_C3_Peat, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C3_Peat, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3- Peat", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C3_Peat)
-
-
-```
-
-```{r Peat PCA}
-
-# --- Subset Data for PCA ---
-# Only include the elements you wish to use for the PCA
-C3_Peat <- subset(clr_data_C3, Depth >=0 & Depth <=53.5)
-
-C3_Peat <- C3_Peat %>% select(-c("Depth", "K", "Cl"))
-
-# --- Perform PCA on clr-transformed data ---
-pca_results_C3_Peat <- prcomp(C3_Peat, center = TRUE, scale. = TRUE)
-
-# --- Extract PCA Scores ---
-scores_C3_Peat <- data.frame(pca_results_C3_Peat$x[, 1:2])
-colnames(scores_C3_Peat) <- c("PC1", "PC2")
-
-# --- Add Depth and Facies Information ---
-# Here, we assume you have a depth vector (Depth_cm) from your original data.
-# Adjust this accordingly if Depth_cm is stored elsewhere.
-scores_C3_Peat$Depth <- C3_Peat$Depth  # Replace 'original_data' with your depth data frame
-
-# Create facies based on depth intervals:
-# ZC3A: 55-95 cm, ZC3B: 40-55 cm, ZC3C: 20-40 cm, ZC2D: 0-20 cm.
-scores_C3_Peat$Facies <- cut(scores_C3_Peat$Depth,
-                     breaks = c(0, 20, 40, 53),
-                     labels = c("ZC3A", "ZC3B", "ZC3C"),
-                     include.lowest = TRUE, right = TRUE)
-
-#Eliminate ant NaN values
-scores_C3_Peat <- scores_C3_Peat[complete.cases(scores_C3_Peat), ]
-
-
-# --- Extract and scale Loadings ---
-loadings_C3_Inor <- pca_results_C3_Peat$rotation[, 1:2] * 
-  matrix(pca_results_C3_Peat$sdev[1:2], nrow = nrow(pca_results_C3_Peat$rotation), ncol = 2, byrow = TRUE)
-loadings_C3_Inor <- data.frame(loadings_C3_Inor)
-colnames(loadings_C3_Inor) <- c("PC1", "PC2")
-loadings_C3_Inor$variable <- rownames(loadings_C3_Inor)
-
-# Create the correlation biplot with fixed axes [-1, 1]
-pca_biplot_cor_C3_Carb <- ggplot() +
-  geom_segment(data = loadings_C3_Inor, 
-               aes(x = 0, y = 0, xend = PC1, yend = PC2), 
-               arrow = arrow(length = unit(0.2, "cm")), 
-               color = "black") +
-  geom_text_repel(data = loadings_C3_Inor, 
-                  aes(x = PC1, y = PC2, label = variable), 
-                  color = "red", size = 4) +
-  theme_minimal() +
-  labs(title = "Correlation Biplot from clr-transformed XRF Data in C3", 
-       x = "PC1", y = "PC2") +
-  xlim(-1, 1) +
-  ylim(-1, 1)
-
-print(pca_biplot_cor_C3_Carb)
-
-pcaC2_biplot_facies_facets_C3_Inor <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies), alpha = 0.7, size = 2) +
-  facet_wrap(~ Facies) +
-  theme_minimal() +
-  labs(title = "PCA Biplot Faceted by Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-pcaC2_biplot_facies_facets_C3_Inor
-
-# --- Create the PCA Biplot (Individual Factor Map) ---
-pcaC3_biplot_facies_Inor <- ggplot() +
-  # Plot sample scores, colored by facies
-  geom_point(data = scores_C3_Peat, aes(x = PC1, y = PC2, color = Facies, text = Depth), alpha = 0.7, size = 2) +
-  theme_minimal() +
-  labs(title = "PCA Biplot with Facies for Core C3",
-       x = "PC1", y = "PC2", color = "Facies")
-
-# Print the plot
-print(pcaC3_biplot_facies_Inor)
-
-interactive_plot_PCA_C3_Inor <- ggplotly(pcaC3_biplot_facies_Inor, tooltip = c("x", "y", "color", "text"))
-```
-
-
-
-
-
-
-

@@ -375,7 +375,7 @@ if(!dir.exists("Rdata")){
 }
 
 # Save both clr datasets together
-save(clr_data_C2, clr_data_C3,
+save(elements_keep_C2, elements_keep_C3, clr_data_C2, clr_data_C3,
      file = "RData/clr_XRF_cores.RData")
 
 print("files are now ready for Code 2: XRF PCA analysis")
