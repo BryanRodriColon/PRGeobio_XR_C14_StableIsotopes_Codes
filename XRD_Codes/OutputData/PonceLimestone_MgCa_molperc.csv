@@ -1,0 +1,31 @@
+"Sample","Mineral_Type","mol_perc_MgCo3_calc_eq","mol_percentage_MgCO3","mol_percentage_CaCO3","Mineral_Phase","Max_tth_in_range","dSpacing"
+"Pl-1","Calcite","Arvidson & Mackenzie, 1999",9.8,90.2,"Intermediate Mg-Calcite",29.677243201851,3.00776176778736
+"Pl-1","Calcite","Lumsden and Chimahusky, 1980",9.41,90.59,"Intermediate Mg-Calcite",29.677243201851,3.00776176778736
+"Pl-16","Calcite","Arvidson & Mackenzie, 1999",9.02,90.98,"Intermediate Mg-Calcite",29.6558109721566,3.00988667581318
+"Pl-16","Calcite","Lumsden and Chimahusky, 1980",8.7,91.3,"Intermediate Mg-Calcite",29.6558109721566,3.00988667581318
+"Pl-13","Calcite","Arvidson & Mackenzie, 1999",12.32,87.68,"High Mg-Calcite",29.7475243413132,3.00081544998498
+"Pl-13","Calcite","Lumsden and Chimahusky, 1980",11.73,88.27,"Intermediate Mg-Calcite",29.7475243413132,3.00081544998498
+"Pl-9","Calcite","Arvidson & Mackenzie, 1999",16.53,83.47,"High Mg-Calcite",29.8652963638653,2.98924948107746
+"Pl-9","Calcite","Lumsden and Chimahusky, 1980",15.58,84.42,"High Mg-Calcite",29.8652963638653,2.98924948107746
+"Calcite Standard","Calcite","Arvidson & Mackenzie, 1999",1.52,98.48,"Low Mg-Calcite",29.4496087596683,3.03049058170467
+"Calcite Standard","Calcite","Lumsden and Chimahusky, 1980",1.84,98.16,"Low Mg-Calcite",29.4496087596683,3.03049058170467
+"High Mg Calcite Standard","Calcite","Arvidson & Mackenzie, 1999",22.8,77.2,"High Mg-Calcite",30.0423593502534,2.97203345244051
+"High Mg Calcite Standard","Calcite","Lumsden and Chimahusky, 1980",21.32,78.68,"High Mg-Calcite",30.0423593502534,2.97203345244051
+"Pl-15","Dolomite","Arvidson & Mackenzie, 1999",58.22,41.78,"Mg-Dolomite",31.0847101403204,2.87470842876352
+"Pl-15","Dolomite","Lumsden and Chimahusky, 1980",53.76,46.24,"Mg-Dolomite",31.0847101403204,2.87470842876352
+"Pl-16","Dolomite","Arvidson & Mackenzie, 1999",56.98,43.02,"Mg-Dolomite",31.0468000008187,2.87813216259103
+"Pl-16","Dolomite","Lumsden and Chimahusky, 1980",52.62,47.38,"Mg-Dolomite",31.0468000008187,2.87813216259103
+"Pl-5","Dolomite","Arvidson & Mackenzie, 1999",58.32,41.68,"Mg-Dolomite",31.0876692686393,2.87444154040762
+"Pl-5","Dolomite","Lumsden and Chimahusky, 1980",53.85,46.15,"Mg-Dolomite",31.0876692686393,2.87444154040762
+"Pl-8","Dolomite","Arvidson & Mackenzie, 1999",58.19,41.81,"Mg-Dolomite",31.0838111897852,2.87478951669629
+"Pl-8","Dolomite","Lumsden and Chimahusky, 1980",53.74,46.26,"Mg-Dolomite",31.0838111897852,2.87478951669629
+"Pl-C2","Dolomite","Arvidson & Mackenzie, 1999",51.87,48.13,"Mg-Dolomite",30.8923902219041,2.89216513899222
+"Pl-C2","Dolomite","Lumsden and Chimahusky, 1980",47.94,52.06,"Ca-dolomite",30.8923902219041,2.89216513899222
+"Pl-Canal","Dolomite","Arvidson & Mackenzie, 1999",54.5,45.5,"Mg-Dolomite",30.9716483969445,2.88494434058916
+"Pl-Canal","Dolomite","Lumsden and Chimahusky, 1980",50.35,49.65,"Stoichiometric Dolomite",30.9716483969445,2.88494434058916
+"Pl-B1","Dolomite","Arvidson & Mackenzie, 1999",56.13,43.87,"Mg-Dolomite",31.0210807380644,2.88045974266328
+"Pl-B1","Dolomite","Lumsden and Chimahusky, 1980",51.85,48.15,"Mg-Dolomite",31.0210807380644,2.88045974266328
+"Pl-C1","Dolomite","Arvidson & Mackenzie, 1999",52.72,47.28,"Mg-Dolomite",30.9181125876647,2.88981759835731
+"Pl-C1","Dolomite","Lumsden and Chimahusky, 1980",48.73,51.27,"Ca-dolomite",30.9181125876647,2.88981759835731
+"Dolomite Standard","Dolomite","Arvidson & Mackenzie, 1999",56.98,43.02,"Mg-Dolomite",31.0468000008187,2.87813216259103
+"Dolomite Standard","Dolomite","Lumsden and Chimahusky, 1980",52.62,47.38,"Mg-Dolomite",31.0468000008187,2.87813216259103

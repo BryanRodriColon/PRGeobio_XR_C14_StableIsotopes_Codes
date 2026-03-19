@@ -1,0 +1,21 @@
+"Sample","Mineral_Type","mol_perc_MgCo3_calc_eq","mol_percentage_MgCO3","mol_percentage_CaCO3","Mineral_Phase","Max_tth_in_range","dSpacing"
+"Sand - Canal","Calcite","Arvidson & Mackenzie, 1999",5.83,94.17,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Sand - Canal","Calcite","Lumsden and Chimahusky, 1980",5.78,94.22,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Sand - Jungle Beach","Calcite","Arvidson & Mackenzie, 1999",5.83,94.17,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Sand - Jungle Beach","Calcite","Lumsden and Chimahusky, 1980",5.78,94.22,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Sand - PO","Calcite","Arvidson & Mackenzie, 1999",5.83,94.17,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Sand - PO","Calcite","Lumsden and Chimahusky, 1980",5.78,94.22,"Intermediate Mg-Calcite",29.5677644313305,3.01864879410007
+"Calcite Standard","Calcite","Arvidson & Mackenzie, 1999",1.52,98.48,"Low Mg-Calcite",29.4496087596683,3.03049058170467
+"Calcite Standard","Calcite","Lumsden and Chimahusky, 1980",1.84,98.16,"Low Mg-Calcite",29.4496087596683,3.03049058170467
+"Sand - Canal","Calcite","Arvidson & Mackenzie, 1999",21.18,78.82,"High Mg-Calcite",29.9963865075107,2.97648367163413
+"Sand - Canal","Calcite","Lumsden and Chimahusky, 1980",19.84,80.16,"High Mg-Calcite",29.9963865075107,2.97648367163413
+"Sand - Jungle Beach","Calcite","Arvidson & Mackenzie, 1999",22.07,77.93,"High Mg-Calcite",30.0215995708154,2.97404131258709
+"Sand - Jungle Beach","Calcite","Lumsden and Chimahusky, 1980",20.65,79.35,"High Mg-Calcite",30.0215995708154,2.97404131258709
+"Sand - PO","Calcite","Arvidson & Mackenzie, 1999",21.18,78.82,"High Mg-Calcite",29.9963865075107,2.97648367163413
+"Sand - PO","Calcite","Lumsden and Chimahusky, 1980",19.84,80.16,"High Mg-Calcite",29.9963865075107,2.97648367163413
+"High Mg Calcite Standard","Calcite","Arvidson & Mackenzie, 1999",22.8,77.2,"High Mg-Calcite",30.0423593502534,2.97203345244051
+"High Mg Calcite Standard","Calcite","Lumsden and Chimahusky, 1980",21.32,78.68,"High Mg-Calcite",30.0423593502534,2.97203345244051
+"Sand - PO","Dolomite","Arvidson & Mackenzie, 1999",61.91,38.09,"Mg-Dolomite",31.1976289068079,2.86456047588343
+"Sand - PO","Dolomite","Lumsden and Chimahusky, 1980",57.15,42.85,"Mg-Dolomite",31.1976289068079,2.86456047588343
+"Dolomite Standard","Dolomite","Arvidson & Mackenzie, 1999",56.98,43.02,"Mg-Dolomite",31.0468000008187,2.87813216259103
+"Dolomite Standard","Dolomite","Lumsden and Chimahusky, 1980",52.62,47.38,"Mg-Dolomite",31.0468000008187,2.87813216259103

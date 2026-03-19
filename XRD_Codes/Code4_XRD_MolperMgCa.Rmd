@@ -1,0 +1,741 @@
+---
+title: 'XRD Code 4: MgCa % calculation'
+author: "Bryan Rodriguez"
+date: "2025-03-23"
+output: html_document
+---
+
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT.***
+
+# XRD Code 4 – Quantification of MgCO₃ content in carbonate minerals
+
+## Overview
+
+This script quantifies the **molar percentage of MgCO₃** in carbonate minerals (calcite and dolomite) using X-ray diffraction (XRD) data. The approach is based on empirical relationships between **d-spacing of diagnostic peaks** and Mg substitution in carbonate lattices.
+
+The calculations implemented here follow established formulations from:
+
+-   Arvidson & Mackenzie (1999)\
+-   Lumsden & Chimahusky (1980)
+
+These relationships allow classification of carbonate phases into:
+
+-   Low Mg-calcite\
+-   Intermediate Mg-calcite\
+-   High Mg-calcite\
+-   Very high Mg-calcite
+
+## Objectives
+
+1.  Extract peak positions from XRD spectra\
+2.  Calculate d-spacing for carbonate minerals\
+3.  Estimate mol% MgCO₃ using published empirical equations\
+4.  Classify carbonate mineral phases based on Mg content\
+5.  Compare results across samples and sedimentary facies
+
+## Conceptual background
+
+Mg substitution in calcite and dolomite alters lattice parameters, producing **systematic shifts in diffraction peak positions**. These shifts can be quantified through Bragg’s Law:
+
+$$
+d = \frac{\lambda}{2 \sin(\theta)}
+$$
+
+where: - $d$ = interplanar spacing\
+- $\lambda$ = X-ray wavelength (Cu Kα = 1.54056 Å)\
+- $\theta$ = diffraction angle
+
+Empirical calibrations then relate **d-spacing to mol% MgCO₃**, enabling geochemical interpretation of carbonate mineralogy.
+
+Key references:
+
+-   Arvidson, R.S. & Mackenzie, F.T. (1999). *The dolomite problem; control of precipitation kinetics by temperature and saturation state.* American Journal of Science.\
+-   Lumsden, D.N. & Chimahusky, J.S. (1980). *Relationship between dolomite nonstoichiometry and carbonate facies parameters.* SEPM Journal.
+
+## Input data
+
+The script uses:
+
+-   Aligned XRD spectra (from Code 2)\
+-   Peak intensity data (`counts`)\
+-   Diffraction angles (`2θ`, stored as `tth`)
+
+Data are organized as lists of data frames, where each entry corresponds to an individual sample.
+
+## Workflow
+
+### 1. Peak extraction
+
+For each sample:
+
+-   A diagnostic 2θ range is defined (e.g., calcite or dolomite peaks)\
+-   The script isolates data within that range\
+-   The **maximum intensity peak** is identified
+
+This peak represents the dominant crystalline reflection for that mineral.
+
+------------------------------------------------------------------------
+
+### 2. Weighted peak position
+
+Instead of using a single point, the code calculates a **weighted average peak position**:
+
+$$
+\text{DivSum} = \frac{\sum (\text{counts} \cdot 2\theta)}{\sum \text{counts}}
+$$
+
+This improves robustness by accounting for peak shape and noise.
+
+------------------------------------------------------------------------
+
+### 3. d-spacing calculation
+
+The weighted peak position is converted to d-spacing using Bragg’s Law:
+
+$$
+d = \frac{1.54056}{2 \sin(\theta)}
+$$
+
+------------------------------------------------------------------------
+
+### 4. MgCO₃ estimation
+
+Two independent empirical equations are applied:
+
+#### Arvidson & Mackenzie (1999)
+
+$$
+\text{mol% MgCO₃} = -363.96 \cdot d + 1104.5
+$$
+
+#### Lumsden & Chimahusky (1980)
+
+$$
+\text{mol% MgCO₃} = 100 - (333.33 \cdot d - 911.99)
+$$
+
+These provide parallel estimates for comparison and validation.
+
+------------------------------------------------------------------------
+
+### 5. Mineral classification
+
+Based on calculated Mg content, samples are classified as:
+
+-   0–4% → Low Mg-calcite\
+
+-   4–12% → Intermediate Mg-calcite\
+
+-   12–30% → High Mg-calcite\
+
+-   
+
+    > 30% → Very high Mg-calcite
+
+------------------------------------------------------------------------
+
+### 6. Output
+
+For each sample, the script returns:
+
+-   Sample name\
+-   Mineral type (calcite or dolomite)\
+-   Equation used\
+-   mol% MgCO₃\
+-   mol% CaCO₃\
+-   Mineral classification
+
+These outputs are compiled into data frames for downstream analysis and plotting.
+
+------------------------------------------------------------------------
+
+## Role in the study
+
+This script provides **quantitative mineralogical constraints** that complement:
+
+-   XRD phase identification (Codes 1–3)\
+-   Petrographic observations\
+-   Sedimentological interpretation
+
+In particular, Mg content is critical for:
+
+-   Identifying very high Mg-calcite phases\
+-   Interpreting microbial vs abiotic precipitation\
+-   Linking mineralogy to environmental conditions (e.g., salinity, Mg/Ca ratios)
+
+------------------------------------------------------------------------
+
+## Notes
+
+-   The method assumes well-defined crystalline peaks\
+-   Results may be less reliable for poorly crystalline or mixed-phase samples\
+-   Using two independent equations allows internal consistency checks\
+-   The workflow is modular and can be adapted for additional carbonate phases
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+```
+
+```{r load packages, include=F, ECHO =F}
+library(powdR)
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(baseline)
+library(EEM)
+library(data.table)
+library(tidyverse)
+library(conflicted)
+library(stringr)
+```
+
+# Functions
+
+The following functions will be used to get the d-spacing of crystalline phases by getting that maxium value from the highest peak
+
+```{r Mol% calculation Function for crystalline calcites}
+calculate_calcite_for_list <- function(df_listCal, calcite_range) {
+  results_listCal <- list()
+  
+  for (i in seq_along(df_listCal)) {
+    sample_name <- names(df_listCal)[i]
+    sample_df <- df_listCal[[i]]
+    
+    # Select rows where "2theta" is in the specified range for Calcite
+    selected_dataCal <- sample_df[sample_df$tth >= calcite_range[1] & sample_df$tth <= calcite_range[2], ]
+    
+    if (nrow(selected_dataCal) == 0) {
+      # If no data in the specified range, return an empty data frame
+      next
+    }
+    
+    # Find the index of the row with the highest counts
+    max_count_index <- which.max(selected_dataCal$counts)
+    
+    # Get the tth value with the highest counts
+    max_tth <- selected_dataCal$tth[max_count_index]
+    
+    # Calculate DivSum and dSpacing for Calcite using the max tth
+    DivSumCal <- sum((selected_dataCal$counts * max_tth)) / sum(selected_dataCal$counts)
+    dSpacingCal <- (1.54056) / (2 * sin((pi / 180) * (DivSumCal / 2)))
+    
+    # Calculate values using equations for Calcite
+    equation1 <- (-363.96 * dSpacingCal) + 1104.5 # Arvidson & Mackenzie, 1999
+    equation2 <- 100 - ((333.33 * dSpacingCal) - 911.99) # Lumsden and Chimahusky, 1980
+    
+    # Determine the Calcite Type based on the calculated values
+    calcite_type1 <- ifelse(equation1 >= 0 & equation1 < 4, "Low Mg-Calcite",
+                            ifelse(equation1 >= 4 & equation1 < 12, "Intermediate Mg-Calcite",
+                                   ifelse(equation1 >= 12 & equation1 <= 30, "High Mg-Calcite", 
+                                          ifelse(equation1 >= 31 & equation1 <= 44, "Very High Mg-Calcite", NA))))
+    
+    calcite_type2 <- ifelse(equation2 >= 0 & equation2 < 4, "Low Mg-Calcite",
+                            ifelse(equation2 >= 4 & equation2 < 12, "Intermediate Mg-Calcite",
+                                   ifelse(equation2 >= 12 & equation2 <= 30, "High Mg-Calcite", 
+                                  ifelse(equation2 >= 31 & equation2 <= 44, " Very High Mg-Calcite", NA))))
+    
+    # Calculate mol_percentage_CaCO3
+    mol_percentage_CaCO3_1 <- 100 - equation1
+    mol_percentage_CaCO3_2 <- 100 - equation2
+    
+    # Create data frames for the results for Calcite based on both equations
+    result_dfCal1 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Calcite",
+      "mol_perc_MgCo3_calc_eq" = "Arvidson & Mackenzie, 1999",
+      "mol_percentage_MgCO3" = round(equation1, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_1, 2),
+      "Mineral_Phase" = calcite_type1,
+      "Max_tth_in_range" = max_tth,
+      "dSpacing" = dSpacingCal
+    )
+    
+    result_dfCal2 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Calcite",
+      "mol_perc_MgCo3_calc_eq" = "Lumsden and Chimahusky, 1980",
+      "mol_percentage_MgCO3" = round(equation2, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_2, 2),
+      "Mineral_Phase" = calcite_type2,
+      "Max_tth_in_range" = max_tth,
+      "dSpacing" = dSpacingCal
+    )
+    
+    results_listCal[[i]] <- rbind(result_dfCal1, result_dfCal2) # Store both results for the sample
+  }
+  
+  final_result_ListCal <- do.call(rbind, results_listCal)
+  row.names(final_result_ListCal) <- NULL
+  
+  return(final_result_ListCal)
+}
+```
+
+```{r Mol% calculation Function for crystalline dolomites}
+
+calculate_dolomite_for_list <- function(df_listDol, dolomite_range) {
+  results_listDol <- list()
+  
+  for (i in seq_along(df_listDol)) {
+    sample_name <- names(df_listDol)[i]
+    sample_df <- df_listDol[[i]]
+    
+    # Select rows where "2theta" is in the specified range for Dolomite
+    selected_dataDol <- sample_df[sample_df$tth >= dolomite_range[1] & sample_df$tth <= dolomite_range[2], ]
+    
+    if (nrow(selected_dataDol) == 0) {
+      # If no data in the specified range, return an empty data frame
+      next
+    }
+    
+    # Find the index of the row with the highest counts
+    max_count_index <- which.max(selected_dataDol$counts)
+    
+    # Get the tth value with the highest counts
+    max_tth <- selected_dataDol$tth[max_count_index]
+    
+    # Calculate DivSum and dSpacing for Dolomite using the max tth
+    DivSumDol <- sum((selected_dataDol$counts * max_tth)) / sum(selected_dataDol$counts)
+    dSpacingDol <- (1.54056) / (2 * sin((pi / 180) * (DivSumDol / 2)))
+    
+    # Calculate values using equations for Dolomite
+    equation1 <- (-363.96 * dSpacingDol) + 1104.5 # Arvidson & Mackenzie, 1999
+    equation2 <- 100 - ((333.33 * dSpacingDol) - 911.99) # Lumsden and Chimahusky, 1980
+    
+    # Determine the Dolomite Type based on the calculated values
+    dolomite_type1 <- ifelse(equation1 >= 45 & equation1 < 49, "Ca-dolomite",
+                            ifelse(equation1 >= 49.4 & equation1 <= 50.4, "Stoichiometric Dolomite",
+                                   ifelse(equation1 >= 50.5, "Mg-Dolomite", "Very High Mg-Calcite")))
+    
+    dolomite_type2 <- ifelse(equation2 >= 45 & equation2 < 49, "Ca-dolomite",
+                            ifelse(equation2 >= 49.4 & equation2 <= 50.4, "Stoichiometric Dolomite",
+                                   ifelse(equation2 >= 50.5, "Mg-Dolomite", "Very High Mg-Calcite")))
+    
+    # Calculate mol_percentage_CaCO3
+    mol_percentage_CaCO3_1 <- 100 - equation1
+    mol_percentage_CaCO3_2 <- 100 - equation2
+    
+    # Create data frames for the results for Dolomite based on both equations
+    result_dfDol1 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Dolomite",
+      "mol_perc_MgCo3_calc_eq" = "Arvidson & Mackenzie, 1999",
+      "mol_percentage_MgCO3" = round(equation1, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_1, 2),
+      "Mineral_Phase" = dolomite_type1,
+      "Max_tth_in_range" = max_tth,
+      "dSpacing" = dSpacingDol
+    )
+    
+    result_dfDol2 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Dolomite",
+      "mol_perc_MgCo3_calc_eq" = "Lumsden and Chimahusky, 1980",
+      "mol_percentage_MgCO3" = round(equation2, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_2, 2),
+      "Mineral_Phase" = dolomite_type2,
+      "Max_tth_in_range" = max_tth,
+      "dSpacing" = dSpacingDol
+    )
+    
+    results_listDol[[i]] <- rbind(result_dfDol1, result_dfDol2) # Store both results for the sample
+  }
+  
+  final_result_ListDol <- do.call(rbind, results_listDol)
+  row.names(final_result_ListDol) <- NULL
+  
+  return(final_result_ListDol)
+}
+
+```
+
+```{r Mol% calculation Function for NON-crystalline calcites}
+calculate_calcite_for_list_NonCrystalline <- function(df_listCal, calcite_range) {
+  results_listCal <- list()
+  
+  for (i in seq_along(df_listCal)) {
+    sample_name <- names(df_listCal)[i]
+    sample_df <- df_listCal[[i]]
+    
+    # Select rows where "2theta" is in the specified range for Calcite
+    selected_dataCal <- sample_df[sample_df$tth >= calcite_range[1] & sample_df$tth <= calcite_range[2], ]
+    
+    if (nrow(selected_dataCal) == 0) {
+      # If no data in the specified range, return an empty data frame
+      next
+    }
+    
+    
+    # Find the index of the row with the highest counts
+    max_count_index <- which.max(selected_dataCal$counts)
+    
+    # Get the tth value with the highest counts
+    max_tth <- selected_dataCal$tth[max_count_index]
+    
+    # Calculate DivSum and dSpacing for Calcite using the max tth
+    DivSumCal <- sum((selected_dataCal$counts * selected_dataCal$tth)) / sum(selected_dataCal$counts)
+    dSpacingCal <- (1.54056) / (2 * sin((pi / 180) * (DivSumCal / 2)))
+    
+    # Calculate values using equations for Calcite
+    equation1 <- (-363.96 * dSpacingCal) + 1104.5 # Arvidson & Mackenzie, 1999
+    equation2 <- 100 - ((333.33 * dSpacingCal) - 911.99) # Lumsden and Chimahusky, 1980
+    
+    # Determine the Calcite Type based on the calculated values
+    calcite_type1 <- ifelse(equation1 >= 0 & equation1 < 4, "Low Mg-Calcite",
+                            ifelse(equation1 >= 4 & equation1 < 12, "Intermediate Mg-Calcite",
+                                   ifelse(equation1 >= 12 & equation1 <= 30, "High Mg-Calcite", 
+                                          ifelse(equation1 >= 31 & equation1 <= 44, "Very High Mg-Calcite", NA))))
+    
+    calcite_type2 <- ifelse(equation2 >= 0 & equation2 < 4, "Low Mg-Calcite",
+                            ifelse(equation2 >= 4 & equation2 < 12, "Intermediate Mg-Calcite",
+                                   ifelse(equation2 >= 12 & equation2 <= 30, "High Mg-Calcite", 
+                                  ifelse(equation2 >= 31 & equation2 <= 44, " Very High Mg-Calcite", NA))))
+    
+    # Calculate mol_percentage_CaCO3
+    mol_percentage_CaCO3_1 <- 100 - equation1
+    mol_percentage_CaCO3_2 <- 100 - equation2
+    
+    # Create data frames for the results for Calcite based on both equations
+    result_dfCal1 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Calcite",
+      "mol_perc_MgCo3_calc_eq" = "Arvidson & Mackenzie, 1999",
+      "mol_percentage_MgCO3" = round(equation1, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_1, 2),
+      "Mineral_Phase" = calcite_type1,
+      "Calculated_dSpacing" = dSpacingCal,
+      "Max_2theta_in_range" = max_tth
+    )
+    
+    result_dfCal2 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Calcite",
+      "mol_perc_MgCo3_calc_eq" = "Lumsden and Chimahusky, 1980",
+      "mol_percentage_MgCO3" = round(equation2, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_2, 2),
+      "Mineral_Phase" = calcite_type2,
+      "Calculated_dSpacing" = dSpacingCal,
+      "Max_2theta_in_range" = max_tth
+    )
+    
+    results_listCal[[i]] <- rbind(result_dfCal1, result_dfCal2) # Store both results for the sample
+  }
+  
+  final_result_ListCal <- do.call(rbind, results_listCal)
+  row.names(final_result_ListCal) <- NULL
+  
+  return(final_result_ListCal)
+}
+```
+
+```{r Mol% calculation Function for NON-crystalline dolomites}
+
+calculate_dolomite_for_list_NonCrystalline <- function(df_listDol, dolomite_range) {
+  results_listDol <- list()
+  
+  for (i in seq_along(df_listDol)) {
+    sample_name <- names(df_listDol)[i]
+    sample_df <- df_listDol[[i]]
+    
+    # Select rows where "2theta" is in the specified range for Dolomite
+    selected_dataDol <- sample_df[sample_df$tth >= dolomite_range[1] & sample_df$tth <= dolomite_range[2], ]
+    
+    if (nrow(selected_dataDol) == 0) {
+      # If no data in the specified range, return an empty data frame
+      next
+    }
+    
+    
+     # Find the index of the row with the highest counts
+    max_count_index <- which.max(selected_dataDol$counts)
+    
+    # Get the tth value with the highest counts
+    max_tth <- selected_dataDol$tth[max_count_index]
+    
+    # Calculate DivSum and dSpacing for Dolomite using the max tth
+    DivSumDol <- sum((selected_dataDol$counts * selected_dataDol$tth)) / sum(selected_dataDol$counts)
+    dSpacingDol <- (1.54056) / (2 * sin((pi / 180) * (DivSumDol / 2)))
+    
+    # Calculate values using equations for Dolomite
+    equation1 <- (-363.96 * dSpacingDol) + 1104.5 # Arvidson & Mackenzie, 1999
+    equation2 <- 100 - ((333.33 * dSpacingDol) - 911.99) # Lumsden and Chimahusky, 1980
+    
+    # Determine the Dolomite Type based on the calculated values
+    dolomite_type1 <- ifelse(equation1 >= 45 & equation1 < 49, "Ca-dolomite",
+                            ifelse(equation1 >= 49.4 & equation1 <= 50.4, "Stoichiometric Dolomite",
+                                   ifelse(equation1 >= 50.5, "Mg-Dolomite", "Very High Mg-Calcite")))
+    
+    dolomite_type2 <- ifelse(equation2 >= 45 & equation2 < 49, "Ca-dolomite",
+                            ifelse(equation2 >= 49.4 & equation2 <= 50.4, "Stoichiometric Dolomite",
+                                   ifelse(equation2 >= 50.5, "Mg-Dolomite", "Very High Mg-Calcite")))
+    
+    # Calculate mol_percentage_CaCO3
+    mol_percentage_CaCO3_1 <- 100 - equation1
+    mol_percentage_CaCO3_2 <- 100 - equation2
+    
+    # Create data frames for the results for Dolomite based on both equations
+    result_dfDol1 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Dolomite",
+      "mol_perc_MgCo3_calc_eq" = "Arvidson & Mackenzie, 1999",
+      "mol_percentage_MgCO3" = round(equation1, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_1, 2),
+      "Mineral_Phase" = dolomite_type1,
+      "Calculated_dSpacing" = dSpacingDol,
+      "Max_2theta_in_range" = max_tth
+    )
+    
+    result_dfDol2 <- data.frame(
+      "Sample" = sample_name,
+      "Mineral_Type" = "Dolomite",
+      "mol_perc_MgCo3_calc_eq" = "Lumsden and Chimahusky, 1980",
+      "mol_percentage_MgCO3" = round(equation2, 2),
+      "mol_percentage_CaCO3" = round(mol_percentage_CaCO3_2, 2),
+      "Mineral_Phase" = dolomite_type2,
+      "Calculated_dSpacing" = dSpacingDol,
+      "Max_2theta_in_range" = max_tth
+    )
+    
+    results_listDol[[i]] <- rbind(result_dfDol1, result_dfDol2) # Store both results for the sample
+  }
+  
+  final_result_ListDol <- do.call(rbind, results_listDol)
+  row.names(final_result_ListDol) <- NULL
+  
+  return(final_result_ListDol)
+}
+
+
+```
+
+```{r To reset data without erasing functions}
+rm(list = ls()[!sapply(ls(), function(x) is.function(get(x)))])
+```
+
+# Data
+
+```{r Load Data}
+
+
+minstds_file_list <- readRDS("RData/min_standards.RDS")
+MinStds8389_NoBkg <-minstds_file_list$MinStds8389_NoBkg
+MinStds2797_NoBkg <- minstds_file_list$MinStds2797_NoBkg
+rm(minstds_file_list)
+
+DataNobkg_file_list <- readRDS("RData/Aligned_Data_NoBkg_Smooth.RDS")
+
+PL_NoBkg <- DataNobkg_file_list$PL_NoBkg
+PS_NoBkg <- DataNobkg_file_list$PS_NoBkg
+C2_NoBkg <- DataNobkg_file_list$C2_NoBkg
+C3_NoBkg <- DataNobkg_file_list$C3_NoBkg
+POC_NoBkg <- DataNobkg_file_list$POC_NoBkg
+POE_NoBkg <- DataNobkg_file_list$POE_NoBkg
+JB_NoBkg <- DataNobkg_file_list$JB_NoBkg
+
+rm(DataNobkg_file_list)
+
+```
+
+##Prepare data for functions
+
+```{r Function inputs}
+
+# Below here are the specified tth ranges for Calcite and Dolomite to be used in the in the crystalline fucntions
+calcite_tth_range <- c(28.5, 30.4)
+dolomite_tth_range <- c(30.6, 31.1)
+
+#For non crystalline functions
+LowMgCalcite_tth_range <- c(29.1, 29.6)
+Mgcalcite_tth_range_NonCrys <- c(29.77, 30.14)
+dolomite_tth_range_NonCrys <- c(30.6, 31.33)
+
+##For PS-19, it will be: 
+MicroLowMgCalcite <- c(29.44, 29.65)
+MicroHighMgCalcite <- c(29.85,29.97)
+MicroVHMC <- c(30.3, 30.9)
+
+
+##For POE1
+PO_Mgcal <- c(29.44, 30.70)
+
+##For JB
+JB_Mgcal <- c(29.80, 30.62)
+
+##PS19Crust
+
+PS19Crust_Mgcal <- c(29.1, 29.4)
+
+```
+
+```{r Ponce Limestone Data With Standards}
+
+#Crystalline calcite and dolomite phases
+#Let's start with the crystalline samples that contained calcite. Those are Pl 1, 13, 9 and 16:
+MolMgList_PLCalCrystalline <- as_multi_xy(list("Pl-1" = PL_NoBkg$PL_1_NoHalite, "Pl-16" = PL_NoBkg$PL_16_NoHalite, "Pl-13" = PL_NoBkg$PL_13_NoHalite, "Pl-9" = PL_NoBkg$PL_9_NoHalite, "Calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "High Mg Calcite Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+#Now lets do a list for those with dolomite. Those are 15, 16 (again), 5, 6, 8, canal, B1, C1 and C2:
+MolMgList_PLDolCrystalline <- as_multi_xy(list("Pl-15" = PL_NoBkg$PL_15_NoHalite, "Pl-16" = PL_NoBkg$PL_16_NoHalite, "Pl-5" = PL_NoBkg$PL_5_NoHalite, "Pl-8" = PL_NoBkg$PL_8_NoHalite, "Pl-C2" = PL_NoBkg$PL_James_LC2, "Pl-Canal" = PL_NoBkg$PL_Canal, "Pl-B1" = PL_NoBkg$PL_James_LB1, "Pl-C1" = PL_NoBkg$PL_James_LC1, "Dolomite Standard" = MinStds2797_NoBkg$Dolomite_S2797))
+
+#Non crystalline phases
+
+MolMgList_PLCalNonCrystalline <- as_multi_xy(list("Pl-15" = PL_NoBkg$PL_15_NoHalite, "Pl-5" = PL_NoBkg$PL_5_NoHalite, "Pl-6" = PL_NoBkg$PL_6_NoHalite, "Pl-Canal" = PL_NoBkg$PL_Canal))
+
+MolMgList_PLDolNonCrystalline <- as_multi_xy(list("Pl-6" = PL_NoBkg$PL_6_NoHalite, "Dolomite Standard" = MinStds2797_NoBkg$Dolomite_S2797)) #Only PL-6 has a different dolomite peak than others.
+
+```
+
+```{r Sediment Core data with Standards}
+
+#C2
+#Let's start with the crystalline samples that contained calcite.
+MolMgList_C2CalCrystalline <- as_multi_xy(list("C2 112 cm" = C2_NoBkg$d112cm, "C2 103 cm" = C2_NoBkg$d103cm, "Calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "High Mg Calcite Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+#C3
+MolMgList_C3CalCrystalline <- as_multi_xy(list("C3 39 cm" = C3_NoBkg$d39cm, "C3 42 cm" = C3_NoBkg$d42cm, "C3 44 cm" = C3_NoBkg$d44cm, "C3 47 cm" = C3_NoBkg$d47cm, "C3 49 cm" = C3_NoBkg$d49_gs_cm, "C3 52 cm" = C3_NoBkg$d52cm,"Calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "High Mg Calcite Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+```
+
+```{r Beach Sand data with Standards}
+
+MolMgList_SandsCalNonCrystalline <- as_multi_xy(list("Sand - Canal" = PL_NoBkg$Sand_Canal, "Sand - Jungle Beach" = PL_NoBkg$Sand_JungleBeach, "Sand - PO" = PL_NoBkg$Sand_PO2023, "Calcite Standard" = MinStds2797_NoBkg$Calcite_S2797))
+
+MolMgList_SandsMgCalNonCrystalline <- as_multi_xy(list("Sand - Canal" = PL_NoBkg$Sand_Canal, "Sand - Jungle Beach" = PL_NoBkg$Sand_JungleBeach, "Sand - PO" = PL_NoBkg$Sand_PO2023, "High Mg Calcite Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+MolMgList_SandsDolNonCrystalline <- as_multi_xy(list("Sand - PO" = PL_NoBkg$PL_6_NoHalite, "Dolomite Standard" = MinStds2797_NoBkg$Dolomite_S2797)) 
+
+```
+
+```{r Microbial deposits with standards}
+
+### POE1
+MolMgCaList_POE_CalNonCrystalline <-  as_multi_xy(list("PO-01E crust (2019)" = POE_NoBkg$PO19_01E01_green.2, "PO-01E black layer (2019)" = POE_NoBkg$PO19_01E01_black.4, "calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "HMC Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+## JB-NW
+MolMgCaList_JB_CalNonCrystalline <- as_multi_xy(list("JB-NW Black Layer" = JB_NoBkg$JB19_Center.black, "calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "HMC Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+
+## PS19
+MolMgCaList_PS19Crust_CalNonCrystalline <- as_multi_xy(list("PS19 Upper Crust 1" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Upper.crust2, "PS19 Upper Crust 2" = PS_NoBkg$PS19_NoBkg_Smooth$PS19_Upper.crust1, "calcite Standard" = MinStds2797_NoBkg$Calcite_S2797, "HMC Standard" = MinStds2797_NoBkg$HigMgCal_S2797))
+
+
+
+```
+
+#Calculate Mol % of Mg and Ca in samples
+
+##Ponce Limestone
+
+```{r Calculation for Ponce Limestone}
+
+#CRYSTALLINE
+#Calculate % in Calcites
+resultsCalPL_Crys <- calculate_calcite_for_list(MolMgList_PLCalCrystalline, calcite_tth_range)
+
+#Calculate % in Dolomites
+resultsDolPL_Crys <- calculate_dolomite_for_list(MolMgList_PLDolCrystalline, dolomite_tth_range)
+
+#NONCRYSTALLINE
+
+# Combine results
+resultsCalPL_NoCrys <- calculate_calcite_for_list_NonCrystalline(MolMgList_PLCalNonCrystalline, LowMgCalcite_tth_range)
+#resultsSecondCalPL_NoCrys <- calculate_calcite_for_list_NonCrystalline(MolMgList_PLCalNonCrystalline, SecondCalcite_tth_range)
+resultsDolPL_NoCrys <- calculate_dolomite_for_list_NonCrystalline(MolMgList_PLDolNonCrystalline, dolomite_tth_range_NonCrys)
+
+PL_FinalList_NoCrys <- rbind(resultsCalPL_NoCrys, resultsDolPL_NoCrys) #include resultsSecondCalPL_NoCrys[c(7,8),] if you are going to use it. 
+
+```
+
+```{r Combine and Save for Ponce Limestone}
+
+# Combine results
+PL_FinalList <- rbind(resultsCalPL_Crys, resultsDolPL_Crys)
+PL_FinalList
+# Export the final results to a CSV file
+write.csv(PL_FinalList, "OutputData/PonceLimestone_MgCa_molperc.csv", row.names = FALSE)
+cat("Results have been saved to 'PonceLimestone_MgCa_molperc_ForJames.csv'.\n")
+
+```
+
+##Sediment Cores
+
+```{r Calculation for sediment cores}
+
+##Calculate for C2 (only calcite)
+resultsCalC2_Crys <- calculate_calcite_for_list(MolMgList_C2CalCrystalline, calcite_tth_range)
+
+##C3 (both calcites and dolomites)
+resultsCalC3_Crys <- calculate_calcite_for_list(MolMgList_C3CalCrystalline, calcite_tth_range)
+resultsDolC3_Crys <- calculate_dolomite_for_list(MolMgList_C3CalCrystalline, dolomite_tth_range)
+
+```
+
+```{r Combine Results and Save for sediment cores}
+
+# Combine results
+Cores_FinalList <- rbind(resultsCalC2_Crys, resultsCalC3_Crys, resultsDolC3_Crys)
+
+# Export the final results to a CSV file
+write.csv(Cores_FinalList, "OutputData/SedimentCores_MgCa_molperc.csv", row.names = FALSE)
+cat("Results have been saved to 'SedimentCores_MgCa_molperc.csv'.\n")
+
+```
+
+##Beach Sand
+
+```{r Calculations for beach sand}
+
+# Combine results
+resultsCalSands_NoCrys <- calculate_calcite_for_list(MolMgList_SandsCalNonCrystalline, LowMgCalcite_tth_range)
+resultsMgCalSands_NoCrys <- calculate_calcite_for_list(MolMgList_SandsMgCalNonCrystalline, Mgcalcite_tth_range_NonCrys)
+resultsDolSands_NoCrys <- calculate_dolomite_for_list(MolMgList_SandsDolNonCrystalline, dolomite_tth_range_NonCrys)
+
+```
+
+```{r Combined and save for beach sand}
+
+Sands_FinalList_NoCrys <- rbind(resultsCalSands_NoCrys, resultsMgCalSands_NoCrys, resultsDolSands_NoCrys)
+
+#Save
+write.csv(Sands_FinalList_NoCrys, "OutputData/BeachSand_MgCa_molperc.csv", row.names = FALSE)
+
+```
+
+##Microbialites
+
+```{r Calculation Microbial deposits}
+
+## POE1
+HighMgresultsCal_POE_NoCrys <- calculate_calcite_for_list(MolMgCaList_POE_CalNonCrystalline, PO_Mgcal)
+
+## JB
+HighMgresultsCal_JB_NoCrys <- calculate_calcite_for_list(MolMgCaList_JB_CalNonCrystalline, JB_Mgcal)
+
+## PS19 crusts
+
+HighMgresultsCal_PS19Crust_NoCrys <- calculate_calcite_for_list_NonCrystalline(MolMgCaList_PS19Crust_CalNonCrystalline, PS19Crust_Mgcal)
+
+
+
+###PS19 balck layer
+#HighMgresultsCalMicro_NoCrys <- calculate_calcite_for_list_NonCrystalline(MolMgList_MicroCalNonCrystalline, MicroHighMgCalcite)
+
+```
+
+```{r Combined and save Microbial deposits}
+
+POJB_FinalList_NoCrys <- rbind(HighMgresultsCal_POE_NoCrys, HighMgresultsCal_JB_NoCrys)
+
+print(POJB_FinalList_NoCrys)
+write.csv(HighMgresultsCal_PS19Crust_NoCrys, "OutputData/SV_SS_MgCa_content.csv", row.names = FALSE)
+
+
+```

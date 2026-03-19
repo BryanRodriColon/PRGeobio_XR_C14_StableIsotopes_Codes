@@ -1,0 +1,9 @@
+"Sample","Mineral_Type","mol_perc_MgCo3_calc_eq","mol_percentage_MgCO3","mol_percentage_CaCO3","Mineral_Phase","Calculated_dSpacing","Max_2theta_in_range"
+"PS19 Upper Crust 1","Calcite","Arvidson & Mackenzie, 1999",-5.11,105.11,NA,3.04871947543684,29.384397659409
+"PS19 Upper Crust 1","Calcite","Lumsden and Chimahusky, 1980",-4.24,104.24,NA,3.04871947543684,29.384397659409
+"PS19 Upper Crust 2","Calcite","Arvidson & Mackenzie, 1999",-4.02,104.02,NA,3.04572928796282,29.384397659409
+"PS19 Upper Crust 2","Calcite","Lumsden and Chimahusky, 1980",-3.24,103.24,NA,3.04572928796282,29.384397659409
+"calcite Standard","Calcite","Arvidson & Mackenzie, 1999",-2.34,102.34,NA,3.04110750571606,29.3980098392504
+"calcite Standard","Calcite","Lumsden and Chimahusky, 1980",-1.7,101.7,NA,3.04110750571606,29.3980098392504
+"HMC Standard","Calcite","Arvidson & Mackenzie, 1999",-4.92,104.92,NA,3.04818270812663,29.3206495808143
+"HMC Standard","Calcite","Lumsden and Chimahusky, 1980",-4.06,104.06,NA,3.04818270812663,29.3206495808143
