@@ -355,3 +355,119 @@ C3_Data <- C3_Data %>% arrange(C3_Data$Depth)
 ```
 
 
+```{r LPC2 Individual Calibrations, include= T, echo= T}
+
+# --- C2 summary with CE/BCE fields (individual calibrations) ---
+C2_clean <- C2_Data %>%
+  arrange(Depth) %>%
+  rowwise() %>%
+  mutate(cal = list(summarize_row(Type, Age, Age_Err))) %>%
+  ungroup() %>%
+  tidyr::unnest_wider(col = cal) %>%
+  mutate(
+    Curve = dplyr::case_when(
+      Type %in% c("Plant/Wood","Peat") ~ "IntCal20",
+      Type == "Sediment Organic carbon" ~ "Marine20 (ΔR=137±20)"
+    ),
+    # rounded manuscript-friendly numbers
+    cal_median = round(median),
+    cal95_low  = round(hpd95_low),
+    cal95_high = round(hpd95_high),
+    cal_mean   = round(mean),
+    Calibrated_95_range = sprintf("%d–%d", cal95_low, cal95_high),
+    Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
+
+    # CE/BCE conversions
+    year_ce_median = bp_to_year_ce(cal_median),
+    year_ce_min95  = bp_to_year_ce(cal95_high),  # (older BP → smaller CE)
+    year_ce_max95  = bp_to_year_ce(cal95_low),
+    label_median_cal = fmt_ce_bce(year_ce_median)
+  ) %>%
+  select(Core, Depth, Type, Age, Age_Err, Curve,
+         cal_median, cal95_low, cal95_high, cal_mean,
+         Calibrated_95_range, Label_median_95HPD,
+         year_ce_median, year_ce_min95, year_ce_max95, label_median_cal)
+
+write.csv(C2_clean, "CalibratedDataC2_DeltaR137.csv", row.names = FALSE)
+
+```
+
+
+## LPC3 core
+
+```{r LPC3 individual calibration, include= T, echo= T}
+
+C3_clean <- C3_Data %>%
+  arrange(Depth) %>%
+  rowwise() %>%
+  mutate(cal = list(summarize_row(Type, Age, Age_Err))) %>%
+  ungroup() %>%
+  tidyr::unnest_wider(col = cal) %>%
+  mutate(
+    Curve = dplyr::case_when(
+      Type %in% c("Plant/Wood","Peat") ~ "IntCal20",
+      Type == "Sediment Organic carbon" ~ "Marine20 (ΔR=137±20)"
+    ),
+    cal_median = round(median),
+    cal95_low  = round(hpd95_low),
+    cal95_high = round(hpd95_high),
+    cal_mean   = round(mean),
+    Calibrated_95_range = sprintf("%d–%d", cal95_low, cal95_high),
+    Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
+
+    year_ce_median = bp_to_year_ce(cal_median),
+    year_ce_min95  = bp_to_year_ce(cal95_high),
+    year_ce_max95  = bp_to_year_ce(cal95_low),
+    label_median_cal = fmt_ce_bce(year_ce_median)
+  ) %>%
+  select(Core, Depth, Type, Age, Age_Err, Curve,
+         cal_median, cal95_low, cal95_high, cal_mean,
+         Calibrated_95_range, Label_median_95HPD,
+         year_ce_median, year_ce_min95, year_ce_max95, label_median_cal)
+
+write.csv(C3_clean, "CalibratedDataC3_DeltaR137.csv", row.names = FALSE)
+
+
+```
+
+## Saving Calibration plots for Dissertation Apendix
+
+```{r}
+
+# where to write
+outdir <- "figs_calibrations_C2"
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+
+for(i in seq_len(nrow(C2_Data))){
+  r <- C2_Data[i, ]
+  # skip unknown types
+  if(! r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
+
+  # build the IntCal calibration object
+  res <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20, prob = 0.95)
+
+  # base name like "C2_055cm_Plant-Wood"
+  base <- file.path(
+    outdir,
+    sprintf("%s_%03dcm_%s", r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type))
+  )
+
+  # save as SVG + TIFF (green curve + grey pdf, HPD bars)
+  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
+}
+
+# repeat for C3
+outdir <- "figs_calibrations_C3"
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+for(i in seq_len(nrow(C3_Data))){
+  r <- C3_Data[i, ]
+  if(! r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
+  res <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20, prob = 0.95)
+  base <- file.path(outdir, sprintf("%s_%03dcm_%s", r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type)))
+  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
+}
+
+```
+
+
+
