@@ -43,5 +43,315 @@ library(ragg)
 
 
 
+```{r}
+
+# ---- BP -> calendar year helpers ----
+bp_to_year_ce <- function(bp) 1950 - bp
+fmt_ce_bce    <- function(year_ce)
+  ifelse(year_ce >= 1, sprintf("%d CE", round(year_ce)),
+                    sprintf("%d BCE", abs(round(year_ce - 1))))
+
+# ---- Calibrate without drawing (for summaries) ----
+calibrate_noplot <- function(...) {
+  grDevices::pdf(NULL); on.exit(try(grDevices::dev.off(), silent = TRUE), add = TRUE)
+  IntCal::calibrate(...)
+}
+
+# ---- CalOne: summarized individual calibration (same for C2 & C3) ----
+CalOne <- function(age, err, cc, reservoir = 0, res.err = 0, prob = 0.95){
+  res  <- calibrate_noplot(age = age, error = err, cc = cc,
+                           reservoir = reservoir, resError = res.err, prob = prob)
+
+  dens <- as.data.frame(res[[1]]); names(dens) <- c("calBP","post")
+  dens$post <- pmax(dens$post, 0)
+  dens <- aggregate(post ~ calBP, data = dens, FUN = sum)
+  w <- dens$post / sum(dens$post)
+
+  mean_cal   <- sum(dens$calBP * w)
+  cw         <- cumsum(w)
+  median_cal <- dens$calBP[which(cw >= 0.5)[1]]
+
+  hpd <- as.data.frame(res[[2]]); names(hpd)[1:2] <- c("from","to")
+  hpd_low  <- min(pmin(hpd$from, hpd$to))
+  hpd_high <- max(pmax(hpd$from, hpd$to))
+
+  list(median = as.numeric(median_cal),
+       mean   = as.numeric(mean_cal),
+       hpd95_low  = as.numeric(hpd_low),
+       hpd95_high = as.numeric(hpd_high))
+}
+
+# ---- Choose curve by material (your ΔR=137±20 for marine) ----
+summarize_row <- function(type, age, err, dR = 137, dR_sd = 20){
+  if(type %in% c("Plant/Wood","Peat")){
+    CalOne(age, err, cc = 1)
+  } else if(type == "Sediment Organic carbon"){
+    CalOne(age, err, cc = 2, reservoir = dR, res.err = dR_sd)
+  } else {
+    stop(paste("Unknown Type:", type))
+  }
+}
+
+# ---- Save the IntCal-style plot for one calibration result ----
+# This uses IntCal's own plot method, so the figure matches your first screenshot.
+save_intcal_plot <- function(res, file_base, width_in = 5, height_in = 3, dpi = 600){
+  # SVG (vector)
+  svglite::svglite(paste0(file_base, ".svg"), width = width_in, height = height_in)
+  plot(res)                 # IntCal's plot method
+  dev.off()
+
+  # TIFF (publication raster)
+  ragg::agg_tiff(filename = paste0(file_base, ".tiff"),
+                 width = width_in, height = height_in, units = "in",
+                 res = dpi, compression = "lzw")
+  plot(res)
+  dev.off()
+}
+
+# ---- Build an IntCal calibration result for one row (for plotting) ----
+calibrate_for_row <- function(type, age, err, dR = 137, dR_sd = 20, prob = 0.95){
+  if(type %in% c("Plant/Wood","Peat")){
+    IntCal::calibrate(age = age, error = err, cc = 1, prob = prob)
+  } else if(type == "Sediment Organic carbon"){
+    IntCal::calibrate(age = age, error = err, cc = 2,
+                      reservoir = dR, resError = dR_sd, prob = prob)
+  } else stop(paste("Unknown Type:", type))
+}
+
+```
+
+
+
+```{r}
+
+# force IntCal's S3 method (works even if generic dispatch fails)
+plot_intcal <- function(x, ...) {
+  getS3method("plot", "calibration", asNamespace("IntCal"))(x, ...)
+}
+
+save_intcal_plot <- function(res, file_base, width_in = 5, height_in = 3, dpi = 600){
+  # SVG (vector)
+  svglite::svglite(paste0(file_base, ".svg"), width = width_in, height = height_in)
+  plot_intcal(res)
+  dev.off()
+
+  # TIFF (publication raster)
+  ragg::agg_tiff(filename = paste0(file_base, ".tiff"),
+                 width = width_in, height = height_in, units = "in",
+                 res = dpi, compression = "lzw")
+  plot_intcal(res)
+  dev.off()
+}
+
+calibrate_for_row <- function(type, age, err, dR = 137, dR_sd = 20, prob = 0.95){
+  if (type %in% c("Plant/Wood","Peat")) {
+    IntCal::calibrate(age = age, error = err, cc = 1, prob = prob)
+  } else if (type == "Sediment Organic carbon") {
+    IntCal::calibrate(age = age, error = err, cc = 2,
+                      reservoir = dR, resError = dR_sd, prob = prob)
+  } else stop(paste("Unknown Type:", type))
+}
+
+# example loop for C2
+outdir <- "figs_calibrations_C2"
+if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
+
+for (i in seq_len(nrow(C2_Data))) {
+  r <- C2_Data[i, ]
+  if (!r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
+  res  <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20)
+  base <- file.path(outdir, sprintf("%s_%03dcm_%s",
+                                    r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type)))
+  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
+}
+
+
+```
+
+
+
+
+
+
+
+
+# Functions
+
+## 'CalOne()'
+
+Calibrate a single radiocarbon date and summarize the posterior
+
+description:
+Wrapper around `IntCal::calibrate()` that returns **posterior median, posterior mean, and the overall 95% HPD range** (union of HPD segments), all in **calendar years BP (cal BP)**. Works for IntCal20 (terrestrial) and Marine20 (with optional regional reservoir correction ΔR ± σ).
+
+@param age Numeric. Conventional radiocarbon age (years BP), e.g. 2030.
+@param err Numeric. 1σ measurement uncertainty of the radiocarbon age, e.g. 15.
+@param cc Integer. Calibration curve:
+      - `1` = IntCal20 (terrestrial),
+      - `2` = Marine20,
+      - `3` = SHCal20 (southern hemisphere) [supported by `IntCal::calibrate()`].
+      
+@param reservoir Numeric. Regional reservoir correction ΔR (years) for marine (or 0 for none). Ignored if `cc != 2`.
+@param res.err Numeric. 1σ uncertainty of ΔR (years). Ignored if `cc != 2`.
+@param prob Numeric in (0,1). Credible mass for HPD; default `0.95` (2σ).
+
+@return A named list with:
+\describe{
+\item{median}{Posterior median calendar age (cal BP).}
+\item{mean}{Posterior mean calendar age (cal BP).}
+\item{hpd95_low}{Lower bound of the **overall** HPD union (min over segments).}
+\item{hpd95_high}{Upper bound of the **overall** HPD union (max over segments).}
+}
+
+@details
+- The function computes **mean/median from the full calibrated pdf** (not from a single HPD slice), which avoids bias near calibration-curve wiggles or multi-modal posteriors.
+
+- The HPD returned is the **union envelope**: the minimum of all segment starts and the maximum of all segment ends. If you need each HPD segment separately, use `IntCal::calibrate(...)[[2]]` directly.
+
+- Output is always in **cal BP**.
+
+@section Dependencies:
+Requires `IntCal` package (uses `IntCal::calibrate()`).
+
+@examples
+Terrestrial (IntCal20): 1000 ± 15 14C BP
+CalOne(age = 1000, err = 15, cc = 1)
+
+Marine (Marine20) with ΔR = 137 ± 20
+CalOne(age = 2030, err = 15, cc = 2, reservoir = 137, res.err = 20)
+
+
+
+```{r CalOne function, include= T, echo= T}
+
+# To stop images from being created after calling calibrate()
+calibrate_noplot <- function(...){
+  grDevices::pdf(NULL)                     # open a null device (no file created)
+  on.exit(try(grDevices::dev.off(), silent = TRUE), add = TRUE)
+  IntCal::calibrate(...)
+}
+
+
+
+CalOne <- function(age, err, cc, reservoir = 0, res.err = 0, prob = 0.95){
+  #res  <- IntCal::calibrate(age = age, error = err, cc = cc, reservoir = reservoir, resError = res.err, prob = prob)
+res  <- calibrate_noplot(age = age, error = err, cc = cc,
+                         reservoir = reservoir, resError = res.err, prob = prob)
+
+
+  # Density table -> posterior weights
+  dens <- as.data.frame(res[[1]])
+  names(dens) <- c("calBP","post")
+  dens$post <- pmax(dens$post, 0)
+  dens <- stats::aggregate(post ~ calBP, data = dens, sum)  # collapse duplicates
+  w <- dens$post / sum(dens$post)
+
+  # Mean & median from the full posterior
+  mean_cal <- sum(dens$calBP * w)
+  cw <- cumsum(w)
+  median_cal <- dens$calBP[which(cw >= 0.5)[1]]
+
+  # HPD union (min/max across all segments)
+  hpd <- as.data.frame(res[[2]])
+  names(hpd)[1:2] <- c("from","to")
+  hpd_low  <- min(pmin(hpd$from, hpd$to))
+  hpd_high <- max(pmax(hpd$from, hpd$to))
+
+  list(median = as.numeric(median_cal),
+       mean   = as.numeric(mean_cal),
+       hpd95_low  = as.numeric(hpd_low),
+       hpd95_high = as.numeric(hpd_high))
+}
+
+
+```
+
+## Wrapper helper function
+
+```{r Wrapper, include= T, echo= T}
+# --- Row-wise wrapper to pick the right curve/ΔR ----------------------------
+summarize_row <- function(type, age, err, dR = 137, dR_sd = 20){
+  if(type %in% c("Plant/Wood","Peat")){
+    CalOne(age, err, cc = 1)
+  } else if(type == "Sediment Organic carbon"){
+    CalOne(age, err, cc = 2, reservoir = dR, res.err = dR_sd)
+  } else {
+    stop(paste("Unknown Type:", type))
+  }
+}
+```
+
+
+## Helper functions for age conversions
+
+```{r helper to convert cal BP → CE/BCE labels}
+# --- helper to convert cal BP → CE/BCE labels ---
+bp_to_year_ce   <- function(bp) 1950 - bp
+fmt_ce_bce      <- function(year_ce) ifelse(year_ce >= 1,
+                                            sprintf("%d CE", round(year_ce)),
+                                            sprintf("%d BCE", abs(round(year_ce - 1))))
+
+```
+
+## Function to save calibration plots
+
+```{r}
+
+# given an IntCal::calibrate() result, build a ggplot
+plot_calibration_pdf <- function(res, title = NULL){
+  dens <- as.data.frame(res[[1]]); names(dens) <- c("calBP","post")
+  dens$post <- pmax(dens$post, 0)
+  # scale to area 1 (optional, for comparable heights)
+  dens$post <- dens$post / max(dens$post, na.rm = TRUE)
+
+  # HPD segments (can be multiple rows)
+  hpd <- as.data.frame(res[[2]])
+  names(hpd)[1:2] <- c("from","to")
+
+  p <- ggplot(dens, aes(x = calBP, y = post)) +
+    geom_area(alpha = 0.25) +
+    geom_segment(data = hpd,
+                 aes(x = from, xend = to, y = 0, yend = 0),
+                 linewidth = 2) +
+    scale_x_reverse() +
+    labs(x = "cal yr BP", y = "Posterior density", title = title) +
+    theme_classic()
+  p
+}
+
+# save both TIFF and SVG with consistent sizes
+save_plot_both <- function(p, file_base, width = 4.0, height = 2.0, dpi = 600){
+  ggplot2::ggsave(paste0(file_base, ".svg"), plot = p,
+                  device = svglite::svglite, width = width, height = height, units = "in")
+  ggplot2::ggsave(paste0(file_base, ".tiff"), plot = p,
+                  device = ragg::agg_tiff, width = width, height = height,
+                  units = "in", dpi = dpi, compression = "lzw")
+}
+
+
+```
+
+
+# Load Sediment Core data.
+
+```{r load data,  include=T, echo=T}
+
+C14RawData <- read.csv("Raw_Radiocarbon_Data.csv")
+
+#Data by sediment core. 
+C2_Data <- subset(C14RawData, Core == "C2")
+C3_Data <- subset(C14RawData, Core == "C3")
+
+#Change the Integer classes to numeric classes
+IntergerColumns <- c("Depth", "Age", "Age_Err")
+C2_Data <- C2_Data %>% mutate_if(names(.) %in% IntergerColumns, as.numeric)
+C3_Data <- C3_Data %>% mutate_if(names(.) %in% IntergerColumns, as.numeric)
+
+#Sort the data in numeric order based on the depth column
+C2_Data <- C2_Data %>% arrange(C2_Data$Depth)
+C3_Data <- C3_Data %>% arrange(C3_Data$Depth)
+
+
+```
 
 

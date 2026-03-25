@@ -1,0 +1,18 @@
+Core,Depth,Type,F_Modern,Fm_Err,Age,Age_Err,D14C
+C2,101,Sediment Organic carbon,0.8034,0.002,1760,20,-203.68
+C2,101,Plant/Wood,0.8829,0.0016,1000,15,-124.88
+C2,114,Sediment Organic carbon,0.7765,0.0015,2030,15,-230.35
+C2,23,Plant/Wood,0.9746,0.0019,205,15,-34.01
+C2,37,Sediment Organic carbon,0.8745,0.0016,1080,15,-133.17
+C2,46,Sediment Organic carbon,0.8685,0.0017,1130,15,-139.15
+C2,55,Sediment Organic carbon,0.8453,0.0016,1350,15,-162.1
+C2,55,Plant/Wood,0.9411,0.0028,490,25,-67.19
+C2,83,Sediment Organic carbon,0.8252,0.0022,1540,20,-182.08
+C2,83,Plant/Wood,0.9088,0.0026,770,25,-99.16
+C3,46,Plant/Wood,0.8527,0.0015,1280,15,-154.78
+C3,50,Sediment Organic carbon,0.7978,0.0021,1810,20,-209.19
+C3,54,Plant/Wood,0.7339,0.0015,2490,15,-272.59
+C3,57,Peat,0.6958,0.0013,2910,15,-310.33
+C3,65,Plant/Wood,0.7314,0.0014,2510,15,-275.01
+C3,92,Peat,0.6537,0.0014,3410,15,-352
+C3,92,Plant/Wood,0.6879,0.0015,3010,15,-318.18
