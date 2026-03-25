@@ -1,0 +1,47 @@
+---
+title: 'Code 1: Radiocarbon Calibration and Correction'
+author: "Bryan Rodriguez"
+date: "2026-03-25"
+output: html_document
+---
+
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+#setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XR_C14_StableIsotopes_Codes/RadioCarbon_Codes')
+```
+
+
+```{r}
+library(IntCal) #For radiocarbon calibration.
+library(rbacon) #For age-modeling.
+library(clam)
+library(coffee)
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(baseline)
+library(EEM)
+library(data.table)
+library(tidyverse)
+library(conflicted)
+library(stringr)
+library(svglite)
+library(ragg)
+```
+
+
+
+
+

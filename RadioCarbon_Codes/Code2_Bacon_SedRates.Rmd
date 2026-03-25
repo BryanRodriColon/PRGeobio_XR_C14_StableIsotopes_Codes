@@ -1,0 +1,274 @@
+---
+title: 'Code 2: Bacon and Sed Rates'
+author: "Bryan Rodriguez"
+date: "2026-03-25"
+output: html_document
+---
+
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
+
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+rm(list = ls())
+#setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XR_C14_StableIsotopes_Codes/RadioCarbon_Codes')
+```
+
+
+```{r}
+library(IntCal) #For radiocarbon calibration.
+library(rbacon) #For age-modeling.
+library(clam)
+library(coffee)
+library(ggplot2)
+library(ggsci)
+library(RColorBrewer)
+library(plotly)
+library(dplyr)
+library(tibble)
+library(purrr)
+library(ggpubr)
+library(lubridate)
+library(patchwork)
+library(baseline)
+library(EEM)
+library(data.table)
+library(tidyverse)
+library(conflicted)
+library(stringr)
+library(svglite)
+library(ragg)
+library(tidyr)
+```
+
+
+Run Bacon
+```{r Run Bacon}
+
+Bacon(
+  core = "LPC2",        # new run name (don’t overwrite)
+  acc.mean = 11,
+  thick = 5,               # explicitly define section thickness
+  add.bottom = TRUE,
+ d.min = 0,
+ d.max = 115,
+  suggest = FALSE,
+  accept.suggestions = FALSE
+)
+
+Bacon(
+  core = "LPC3",        # new run name (don’t overwrite)
+  acc.mean = 11,
+  thick = 5,               
+  add.bottom = TRUE,
+  d.min = 0,
+  d.max = 95,
+  suggest = FALSE,
+  accept.suggestions = FALSE
+)
+
+```
+
+# Extract Sedimentation rates from each core
+
+## LPC2
+
+
+```{r}
+
+bacon_raw_LPC2 <- readLines("Bacon_runs/LPC2/LPC2_24.out")
+
+bacon_split_LPC2 <- strsplit(bacon_raw_LPC2, ",")
+bacon_mat_LPC2 <- do.call(rbind, lapply(bacon_split_LPC2, as.numeric))
+
+bacon_df_LPC2 <- as.data.frame(bacon_mat_LPC2)
+
+str(bacon_df_LPC2)
+```
+
+```{r}
+acc_df_LPC2 <- bacon_df_LPC2[, -1]  # remove memory column
+
+
+acc_summary_LPC2 <- acc_df_LPC2 %>%
+  summarise(across(everything(), list(
+    med = ~median(.x),
+    low = ~quantile(.x, 0.025),
+    high = ~quantile(.x, 0.975)
+  )))
+
+
+acc_summary_long_LPC2 <- acc_summary_LPC2 %>%
+  pivot_longer(everything(),
+               names_to = c("section", ".value"),
+               names_sep = "_")
+
+acc_summary_long_LPC2 <- acc_summary_long_LPC2 %>%
+  mutate(rate_mm_yr = 10 / med)
+
+```
+
+```{r}
+section_thickness <- 114 / (26 - 2)
+
+acc_clean_LPC2 <- acc_summary_long_LPC2 %>%
+  mutate(
+    section_num = as.numeric(gsub("V", "", section)) - 1
+  ) %>%
+  filter(!section %in% c("V26", "V27")) %>%
+  mutate(
+    top_depth_cm = (section_num - 1) * section_thickness,
+    bottom_depth_cm = section_num * section_thickness,
+    mid_depth_cm = (top_depth_cm + bottom_depth_cm) / 2
+  )
+```
+
+```{r}
+acc_clean_LPC2 <- acc_clean_LPC2 %>%
+  mutate(
+    low_trim = ifelse(low < quantile(low, 0.05), NA, low)
+  )
+```
+
+
+```{r}
+plotC2 <- ggplot(acc_clean_LPC2,
+       aes(ymin = top_depth_cm, ymax = bottom_depth_cm,
+           xmin = 0, xmax = rate_mm_yr)) +
+    geom_rect(fill = "grey60") +
+    scale_y_reverse() +
+    labs(
+        x = "Sedimentation rate (mm/yr)",
+        y = "Depth (cm)"
+    ) +
+    theme_classic() +
+  ggtitle("LPC2 Sed Rates")
+plotC2
+```
+
+
+## C3
+
+```{r}
+
+bacon_raw_LPC3 <- readLines("Bacon_runs/LPC3/LPC3_20.out")
+
+bacon_split_LPC3 <- strsplit(bacon_raw_LPC3, ",")
+bacon_mat_LPC3 <- do.call(rbind, lapply(bacon_split_LPC3, as.numeric))
+
+bacon_df_LPC3 <- as.data.frame(bacon_mat_LPC3)
+
+str(bacon_df_LPC3)
+```
+
+```{r}
+acc_df_LPC3 <- bacon_df_LPC3[, -1]  # remove memory column
+
+
+acc_summary_LPC3 <- acc_df_LPC3 %>%
+  summarise(across(everything(), list(
+    med = ~median(.x),
+    low = ~quantile(.x, 0.025),
+    high = ~quantile(.x, 0.975)
+  )))
+
+
+acc_summary_long_LPC3 <- acc_summary_LPC3 %>%
+  pivot_longer(everything(),
+               names_to = c("section", ".value"),
+               names_sep = "_")
+
+acc_summary_long_LPC3 <- acc_summary_long_LPC3 %>%
+  mutate(rate_mm_yr = 10 / med)
+
+```
+
+```{r}
+
+n <- length(unique(acc_summary_long_LPC3$section))
+
+section_thickness <- 92 / (n - 2)
+
+acc_clean_LPC3 <- acc_summary_long_LPC3 %>%
+  mutate(
+    section_num = as.numeric(gsub("V", "", section)) - 1
+  ) %>%
+  filter(!section %in% c("V22", "V23")) %>%
+  mutate(
+    top_depth_cm = (section_num - 1) * section_thickness,
+    bottom_depth_cm = section_num * section_thickness,
+    mid_depth_cm = (top_depth_cm + bottom_depth_cm) / 2
+  )
+```
+
+```{r}
+acc_clean_LPC3 <- acc_clean_LPC3 %>%
+  mutate(
+    low_trim = ifelse(low < quantile(low, 0.05), NA, low)
+  )
+```
+
+
+```{r}
+plotC3 <- ggplot(acc_clean_LPC3,
+       aes(ymin = top_depth_cm, ymax = bottom_depth_cm,
+           xmin = 0, xmax = rate_mm_yr)) +
+    geom_rect(fill = "grey60") +
+    scale_y_reverse() +
+    labs(
+        x = "Sedimentation rate (mm/yr)",
+        y = "Depth (cm)"
+    ) +
+    theme_classic() +
+  ggtitle("LPC3 Sed rates")
+plotC3
+```
+
+
+# Save Sedimentation rate plots
+
+```{r}
+ggsave(
+  filename = "plots/C2/sed_rate_C2.svg",
+  plot = plotC2,
+  width = 4,
+  height = 10,
+  units = "in",
+  device = "svg"
+)
+
+ggsave(
+  filename = "plots/C2/sed_rate_C2.png",
+  plot = plotC2,
+  width = 4,
+  height = 10,
+  units = "in",
+  device = "png"
+)
+
+ggsave(
+  filename = "plots/C3/sed_rate_C3.svg",
+  plot = plotC3,
+  width = 4,
+  height = 10,
+  units = "in",
+  device = "svg"
+)
+
+ggsave(
+  filename = "plots/C3/sed_rate_C3.png",
+  plot = plotC3,
+  width = 4,
+  height = 10,
+  units = "in",
+  device = "png"
+)
+```
+
+
+
+
+
+
+
