@@ -3,10 +3,63 @@ title: 'Code 2: Bacon and Sed Rates'
 author: "Bryan Rodriguez"
 date: "2026-03-25"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
-***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
+***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the
+help of chatGPT-5.***
 
+# Code 2: Age–Depth Modeling and Sedimentation Rates (Bacon)
+
+### Overview
+
+This script performs Bayesian age–depth modeling using the `rbacon`
+package (Blaauw and Christen, 2011) and extracts sedimentation rates for
+sediment cores LPC2 and LPC3. The workflow includes model execution,
+extraction of accumulation rates, statistical summarization, conversion
+to sedimentation rates, and visualization.
+
+### Workflow
+
+1.  Run Bacon age–depth models using uncalibrated radiocarbon ages
+2.  Extract accumulation rate outputs from Bacon `.out` files
+3.  Compute median and 95% credible intervals for each depth section
+4.  Convert accumulation rates (yr/cm) to sedimentation rates (mm/yr)
+5.  Reconstruct depth intervals based on core length and Bacon
+    segmentation
+6.  Generate and export sedimentation rate plots
+
+### Key Assumptions
+
+-   Bacon performs internal radiocarbon calibration (IntCal20 by
+    default)
+
+-   Accumulation rates are reported in yr/cm and converted as:
+
+    $$
+    \text{Sedimentation rate (mm/yr)} = \frac{10}{\text{accumulation (yr/cm)}}
+    $$
+
+-   Depth intervals are reconstructed assuming uniform section
+    thickness, defined by:
+
+    -   LPC2: 115 cm total depth
+    -   LPC3: 95 cm total depth
+
+-   Bacon sections are mapped linearly onto measured core depth
+
+### Output
+
+-   Sedimentation rate summaries (median, 95% CI)
+-   Depth-resolved sedimentation rate plots (SVG and PNG)
+
+### Reference
+
+Blaauw, M., and Christen, J.A. (2011). Flexible paleoclimate age–depth
+models using an autoregressive gamma process. *Quaternary
+Geochronology*, 6, 457–474.
 
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
@@ -15,35 +68,25 @@ rm(list = ls())
 #setwd('/Users/bryanrodriguez/Library/Mobile Documents/com~apple~CloudDocs/PhD-PROJECT/R-codes/PRGeobio_XR_C14_StableIsotopes_Codes/RadioCarbon_Codes')
 ```
 
-
-```{r}
-library(IntCal) #For radiocarbon calibration.
-library(rbacon) #For age-modeling.
-library(clam)
-library(coffee)
-library(ggplot2)
-library(ggsci)
-library(RColorBrewer)
-library(plotly)
-library(dplyr)
-library(tibble)
-library(purrr)
-library(ggpubr)
-library(lubridate)
-library(patchwork)
-library(baseline)
-library(EEM)
-library(data.table)
-library(tidyverse)
-library(conflicted)
-library(stringr)
-library(svglite)
-library(ragg)
-library(tidyr)
+```{r Load packages, include=T, message=F}
+library(rbacon)   # Bayesian age–depth modeling
+library(ggplot2)  # plotting sedimentation rates
+library(dplyr)    # data manipulation
+library(tidyr)    # data reshaping
 ```
 
+# Run Bacon Age–Depth Models
 
-Run Bacon
+Bayesian age–depth models are generated for each core using the `rbacon`
+package.\
+The model uses prior information on accumulation rates and divides the
+core into equal-thickness sections.
+
+Parameters: - `acc.mean`: prior mean accumulation rate (yr/cm) -
+`thick`: thickness of each modeled section (cm) - `d.min`, `d.max`:
+minimum and maximum depths of the core - `add.bottom`: ensures model
+extends to full core depth
+
 ```{r Run Bacon}
 
 Bacon(
@@ -70,12 +113,22 @@ Bacon(
 
 ```
 
-# Extract Sedimentation rates from each core
+# Sedimentation rates from each core
 
 ## LPC2
 
+### Extract Accumulation Rates from Bacon Output
 
-```{r}
+Bacon produces `.out` files containing MCMC iterations of accumulation
+rates for each depth section.
+
+Processing steps: 1. Read `.out` file 2. Convert to numeric matrix 3.
+Remove memory column (first column) 4. Structure as a data frame for
+analysis
+
+
+
+```{r Extract_SedRates, include =T}
 
 bacon_raw_LPC2 <- readLines("Bacon_runs/LPC2/LPC2_24.out")
 
@@ -87,7 +140,26 @@ bacon_df_LPC2 <- as.data.frame(bacon_mat_LPC2)
 str(bacon_df_LPC2)
 ```
 
-```{r}
+### Summarize Accumulation Rates
+
+For each depth section: - Median accumulation rate is calculated - 95%
+credible intervals (2.5% and 97.5%) are computed
+
+These statistics represent the posterior distribution of sediment
+accumulation rates.
+
+### Convert Accumulation to Sedimentation Rates
+
+Accumulation rates (yr/cm) are converted to sedimentation rates (mm/yr):
+
+$$
+\text{mm/yr} = \frac{10}{\text{yr/cm}}
+$$
+
+This allows direct interpretation of sedimentation intensity through
+time.
+
+```{r Summarize, include=T}
 acc_df_LPC2 <- bacon_df_LPC2[, -1]  # remove memory column
 
 
@@ -109,8 +181,27 @@ acc_summary_long_LPC2 <- acc_summary_long_LPC2 %>%
 
 ```
 
-```{r}
-section_thickness <- 114 / (26 - 2)
+
+### Reconstruct Depth Intervals
+
+Depth intervals are reconstructed from Bacon sections assuming uniform
+thickness.
+
+-   LPC2 total depth: 115 cm
+
+Section thickness is calculated as:
+
+$$
+\text{section thickness} = \frac{\text{core depth}}{\text{number of sections} - 2}
+$$
+
+The subtraction accounts for edge sections generated by Bacon that are
+excluded.
+
+Depth metrics calculated: - Top depth - Bottom depth - Midpoint depth
+
+```{r Depth Intervals, include=T}
+section_thickness <- 115 / (26 - 2) #Depth of the core
 
 acc_clean_LPC2 <- acc_summary_long_LPC2 %>%
   mutate(
@@ -122,9 +213,7 @@ acc_clean_LPC2 <- acc_summary_long_LPC2 %>%
     bottom_depth_cm = section_num * section_thickness,
     mid_depth_cm = (top_depth_cm + bottom_depth_cm) / 2
   )
-```
 
-```{r}
 acc_clean_LPC2 <- acc_clean_LPC2 %>%
   mutate(
     low_trim = ifelse(low < quantile(low, 0.05), NA, low)
@@ -132,23 +221,14 @@ acc_clean_LPC2 <- acc_clean_LPC2 %>%
 ```
 
 
-```{r}
-plotC2 <- ggplot(acc_clean_LPC2,
-       aes(ymin = top_depth_cm, ymax = bottom_depth_cm,
-           xmin = 0, xmax = rate_mm_yr)) +
-    geom_rect(fill = "grey60") +
-    scale_y_reverse() +
-    labs(
-        x = "Sedimentation rate (mm/yr)",
-        y = "Depth (cm)"
-    ) +
-    theme_classic() +
-  ggtitle("LPC2 Sed Rates")
-plotC2
-```
-
-
 ## C3
+
+Same process as before, only that:
+
+Depth intervals are reconstructed from Bacon sections assuming uniform
+thickness.
+
+-   LPC3 total depth: 95 cm
 
 ```{r}
 
@@ -188,7 +268,7 @@ acc_summary_long_LPC3 <- acc_summary_long_LPC3 %>%
 
 n <- length(unique(acc_summary_long_LPC3$section))
 
-section_thickness <- 92 / (n - 2)
+section_thickness <- 95 / (n - 2)
 
 acc_clean_LPC3 <- acc_summary_long_LPC3 %>%
   mutate(
@@ -200,9 +280,7 @@ acc_clean_LPC3 <- acc_summary_long_LPC3 %>%
     bottom_depth_cm = section_num * section_thickness,
     mid_depth_cm = (top_depth_cm + bottom_depth_cm) / 2
   )
-```
 
-```{r}
 acc_clean_LPC3 <- acc_clean_LPC3 %>%
   mutate(
     low_trim = ifelse(low < quantile(low, 0.05), NA, low)
@@ -210,7 +288,30 @@ acc_clean_LPC3 <- acc_clean_LPC3 %>%
 ```
 
 
-```{r}
+### Plot Sedimentation Rates
+
+Sedimentation rates are visualized as depth-resolved rectangles: -
+X-axis: sedimentation rate (mm/yr) - Y-axis: depth (cm, reversed)
+
+Each rectangle represents a modeled depth interval with its
+corresponding rate.
+
+```{r plotLPC2SedRates}
+plotC2 <- ggplot(acc_clean_LPC2,
+       aes(ymin = top_depth_cm, ymax = bottom_depth_cm,
+           xmin = 0, xmax = rate_mm_yr)) +
+    geom_rect(fill = "grey60") +
+    scale_y_reverse() +
+    labs(
+        x = "Sedimentation rate (mm/yr)",
+        y = "Depth (cm)"
+    ) +
+    theme_classic() +
+  ggtitle("LPC2 Sed Rates")
+plotC2
+```
+
+```{r plotLPC3SedRates, include=T}
 plotC3 <- ggplot(acc_clean_LPC3,
        aes(ymin = top_depth_cm, ymax = bottom_depth_cm,
            xmin = 0, xmax = rate_mm_yr)) +
@@ -225,10 +326,14 @@ plotC3 <- ggplot(acc_clean_LPC3,
 plotC3
 ```
 
+# Save Sedimentation rate plot
 
-# Save Sedimentation rate plots
+Plots are exported in: - SVG format (vector, publication-quality) - PNG
+format (raster)
 
-```{r}
+Dimensions are standardized for consistency across figures.
+
+```{r save Plots, include=T}
 ggsave(
   filename = "plots/C2/sed_rate_C2.svg",
   plot = plotC2,
@@ -265,10 +370,3 @@ ggsave(
   device = "png"
 )
 ```
-
-
-
-
-
-
-
