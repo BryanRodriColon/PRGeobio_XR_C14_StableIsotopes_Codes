@@ -43,137 +43,6 @@ library(ragg)
 
 
 
-```{r}
-
-# ---- BP -> calendar year helpers ----
-bp_to_year_ce <- function(bp) 1950 - bp
-fmt_ce_bce    <- function(year_ce)
-  ifelse(year_ce >= 1, sprintf("%d CE", round(year_ce)),
-                    sprintf("%d BCE", abs(round(year_ce - 1))))
-
-# ---- Calibrate without drawing (for summaries) ----
-calibrate_noplot <- function(...) {
-  grDevices::pdf(NULL); on.exit(try(grDevices::dev.off(), silent = TRUE), add = TRUE)
-  IntCal::calibrate(...)
-}
-
-# ---- CalOne: summarized individual calibration (same for C2 & C3) ----
-CalOne <- function(age, err, cc, reservoir = 0, res.err = 0, prob = 0.95){
-  res  <- calibrate_noplot(age = age, error = err, cc = cc,
-                           reservoir = reservoir, resError = res.err, prob = prob)
-
-  dens <- as.data.frame(res[[1]]); names(dens) <- c("calBP","post")
-  dens$post <- pmax(dens$post, 0)
-  dens <- aggregate(post ~ calBP, data = dens, FUN = sum)
-  w <- dens$post / sum(dens$post)
-
-  mean_cal   <- sum(dens$calBP * w)
-  cw         <- cumsum(w)
-  median_cal <- dens$calBP[which(cw >= 0.5)[1]]
-
-  hpd <- as.data.frame(res[[2]]); names(hpd)[1:2] <- c("from","to")
-  hpd_low  <- min(pmin(hpd$from, hpd$to))
-  hpd_high <- max(pmax(hpd$from, hpd$to))
-
-  list(median = as.numeric(median_cal),
-       mean   = as.numeric(mean_cal),
-       hpd95_low  = as.numeric(hpd_low),
-       hpd95_high = as.numeric(hpd_high))
-}
-
-# ---- Choose curve by material (your ΔR=137±20 for marine) ----
-summarize_row <- function(type, age, err, dR = 137, dR_sd = 20){
-  if(type %in% c("Plant/Wood","Peat")){
-    CalOne(age, err, cc = 1)
-  } else if(type == "Sediment Organic carbon"){
-    CalOne(age, err, cc = 2, reservoir = dR, res.err = dR_sd)
-  } else {
-    stop(paste("Unknown Type:", type))
-  }
-}
-
-# ---- Save the IntCal-style plot for one calibration result ----
-# This uses IntCal's own plot method, so the figure matches your first screenshot.
-save_intcal_plot <- function(res, file_base, width_in = 5, height_in = 3, dpi = 600){
-  # SVG (vector)
-  svglite::svglite(paste0(file_base, ".svg"), width = width_in, height = height_in)
-  plot(res)                 # IntCal's plot method
-  dev.off()
-
-  # TIFF (publication raster)
-  ragg::agg_tiff(filename = paste0(file_base, ".tiff"),
-                 width = width_in, height = height_in, units = "in",
-                 res = dpi, compression = "lzw")
-  plot(res)
-  dev.off()
-}
-
-# ---- Build an IntCal calibration result for one row (for plotting) ----
-calibrate_for_row <- function(type, age, err, dR = 137, dR_sd = 20, prob = 0.95){
-  if(type %in% c("Plant/Wood","Peat")){
-    IntCal::calibrate(age = age, error = err, cc = 1, prob = prob)
-  } else if(type == "Sediment Organic carbon"){
-    IntCal::calibrate(age = age, error = err, cc = 2,
-                      reservoir = dR, resError = dR_sd, prob = prob)
-  } else stop(paste("Unknown Type:", type))
-}
-
-```
-
-
-
-```{r}
-
-# force IntCal's S3 method (works even if generic dispatch fails)
-plot_intcal <- function(x, ...) {
-  getS3method("plot", "calibration", asNamespace("IntCal"))(x, ...)
-}
-
-save_intcal_plot <- function(res, file_base, width_in = 5, height_in = 3, dpi = 600){
-  # SVG (vector)
-  svglite::svglite(paste0(file_base, ".svg"), width = width_in, height = height_in)
-  plot_intcal(res)
-  dev.off()
-
-  # TIFF (publication raster)
-  ragg::agg_tiff(filename = paste0(file_base, ".tiff"),
-                 width = width_in, height = height_in, units = "in",
-                 res = dpi, compression = "lzw")
-  plot_intcal(res)
-  dev.off()
-}
-
-calibrate_for_row <- function(type, age, err, dR = 137, dR_sd = 20, prob = 0.95){
-  if (type %in% c("Plant/Wood","Peat")) {
-    IntCal::calibrate(age = age, error = err, cc = 1, prob = prob)
-  } else if (type == "Sediment Organic carbon") {
-    IntCal::calibrate(age = age, error = err, cc = 2,
-                      reservoir = dR, resError = dR_sd, prob = prob)
-  } else stop(paste("Unknown Type:", type))
-}
-
-# example loop for C2
-outdir <- "figs_calibrations_C2"
-if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
-
-for (i in seq_len(nrow(C2_Data))) {
-  r <- C2_Data[i, ]
-  if (!r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
-  res  <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20)
-  base <- file.path(outdir, sprintf("%s_%03dcm_%s",
-                                    r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type)))
-  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
-}
-
-
-```
-
-
-
-
-
-
-
 
 # Functions
 
@@ -234,9 +103,8 @@ calibrate_noplot <- function(...){
 
 
 CalOne <- function(age, err, cc, reservoir = 0, res.err = 0, prob = 0.95){
-  #res  <- IntCal::calibrate(age = age, error = err, cc = cc, reservoir = reservoir, resError = res.err, prob = prob)
-res  <- calibrate_noplot(age = age, error = err, cc = cc,
-                         reservoir = reservoir, resError = res.err, prob = prob)
+  res  <- IntCal::calibrate(age = age, error = err, cc = cc, reservoir = reservoir, resError = res.err, prob = prob)
+  #res  <- calibrate_noplot(age = age, error = err, cc = cc, reservoir = reservoir, resError = res.err, prob = prob)
 
 
   # Density table -> posterior weights
@@ -336,7 +204,7 @@ save_plot_both <- function(p, file_base, width = 4.0, height = 2.0, dpi = 600){
 
 ```{r load data,  include=T, echo=T}
 
-C14RawData <- read.csv("Raw_Radiocarbon_Data.csv")
+C14RawData <- read.csv("InputData/Raw_Radiocarbon_Data.csv")
 
 #Data by sediment core. 
 C2_Data <- subset(C14RawData, Core == "C2")
@@ -354,7 +222,7 @@ C3_Data <- C3_Data %>% arrange(C3_Data$Depth)
 
 ```
 
-
+ 
 ```{r LPC2 Individual Calibrations, include= T, echo= T}
 
 # --- C2 summary with CE/BCE fields (individual calibrations) ---
@@ -375,7 +243,7 @@ C2_clean <- C2_Data %>%
     cal95_high = round(hpd95_high),
     cal_mean   = round(mean),
     Calibrated_95_range = sprintf("%d–%d", cal95_low, cal95_high),
-    Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
+    #Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
 
     # CE/BCE conversions
     year_ce_median = bp_to_year_ce(cal_median),
@@ -385,10 +253,10 @@ C2_clean <- C2_Data %>%
   ) %>%
   select(Core, Depth, Type, Age, Age_Err, Curve,
          cal_median, cal95_low, cal95_high, cal_mean,
-         Calibrated_95_range, Label_median_95HPD,
+         Calibrated_95_range,
          year_ce_median, year_ce_min95, year_ce_max95, label_median_cal)
 
-write.csv(C2_clean, "CalibratedDataC2_DeltaR137.csv", row.names = FALSE)
+write.csv(C2_clean, "OutputData/CalibratedDataC2_DeltaR137.csv", row.names = FALSE)
 
 ```
 
@@ -413,7 +281,7 @@ C3_clean <- C3_Data %>%
     cal95_high = round(hpd95_high),
     cal_mean   = round(mean),
     Calibrated_95_range = sprintf("%d–%d", cal95_low, cal95_high),
-    Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
+    #Label_median_95HPD  = sprintf("%d [%d–%d]", cal_median, cal95_low, cal95_high),
 
     year_ce_median = bp_to_year_ce(cal_median),
     year_ce_min95  = bp_to_year_ce(cal95_high),
@@ -422,52 +290,12 @@ C3_clean <- C3_Data %>%
   ) %>%
   select(Core, Depth, Type, Age, Age_Err, Curve,
          cal_median, cal95_low, cal95_high, cal_mean,
-         Calibrated_95_range, Label_median_95HPD,
+         Calibrated_95_range,
          year_ce_median, year_ce_min95, year_ce_max95, label_median_cal)
 
-write.csv(C3_clean, "CalibratedDataC3_DeltaR137.csv", row.names = FALSE)
+write.csv(C3_clean, "OutputData/CalibratedDataC3_DeltaR137.csv", row.names = FALSE)
 
 
 ```
-
-## Saving Calibration plots for Dissertation Apendix
-
-```{r}
-
-# where to write
-outdir <- "figs_calibrations_C2"
-if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
-
-for(i in seq_len(nrow(C2_Data))){
-  r <- C2_Data[i, ]
-  # skip unknown types
-  if(! r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
-
-  # build the IntCal calibration object
-  res <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20, prob = 0.95)
-
-  # base name like "C2_055cm_Plant-Wood"
-  base <- file.path(
-    outdir,
-    sprintf("%s_%03dcm_%s", r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type))
-  )
-
-  # save as SVG + TIFF (green curve + grey pdf, HPD bars)
-  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
-}
-
-# repeat for C3
-outdir <- "figs_calibrations_C3"
-if (!dir.exists(outdir)) dir.create(outdir, recursive = TRUE)
-for(i in seq_len(nrow(C3_Data))){
-  r <- C3_Data[i, ]
-  if(! r$Type %in% c("Plant/Wood","Peat","Sediment Organic carbon")) next
-  res <- calibrate_for_row(r$Type, r$Age, r$Age_Err, dR = 137, dR_sd = 20, prob = 0.95)
-  base <- file.path(outdir, sprintf("%s_%03dcm_%s", r$Core, as.integer(r$Depth), gsub("[ /]", "-", r$Type)))
-  save_intcal_plot(res, base, width_in = 5, height_in = 3, dpi = 600)
-}
-
-```
-
 
 
