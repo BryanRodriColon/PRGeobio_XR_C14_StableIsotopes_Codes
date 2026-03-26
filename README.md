@@ -27,13 +27,13 @@ PRGeobio_XR_C14_StableIsotopes_Codes/
 │   ├── Code2_PCA_XRFcores.Rmd
 │   ├── InputData/
 │   ├── OutputData/
+│   ├── plots/
 │   └── RData/
 │
 ├── StableIsotope_Plotting_Codes/
 │   ├── Code1_isoCarbs.Rmd
 │   ├── Code2_isoOrg.Rmd
 │   ├── InputData/
-│   ├── OutputData/
 │   └── plots/
 │
 ├── XRD_Codes/
@@ -44,6 +44,7 @@ PRGeobio_XR_C14_StableIsotopes_Codes/
 │   ├── Code4_XRD_MolperMgCa.Rmd
 │   ├── InputData/
 │   ├── OutputData/
+│   ├── plots/
 │   └── RData/
 │
 ├── RadioCarbon_Codes/
@@ -51,6 +52,7 @@ PRGeobio_XR_C14_StableIsotopes_Codes/
 │   ├── Code2_Bacon_SedRates.Rmd
 │   ├── InputData/
 │   ├── OutputData/
+│   ├── plots/
 │   └── Bacon_runs/
 │
 └── README.md
