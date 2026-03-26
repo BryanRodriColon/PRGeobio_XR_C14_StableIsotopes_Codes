@@ -144,6 +144,10 @@ However, this script also includes additional XRD datasets that are part of rela
 
 This unified structure ensures reproducibility and facilitates comparison across different sample types and projects.
 
+## References
+
+Butler, B.M. and Hillier, S. (2021) powdR: An R package for quantitative mineralogy using full pattern summation of X-ray powder diffraction data. *Computers & Geosciences*, 147, 104662.
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 rm(list = ls())

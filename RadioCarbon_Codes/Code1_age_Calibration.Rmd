@@ -7,6 +7,38 @@ output: html_document
 
 ***Disclaimer: This code was designed by Bryan Rodriguez-Colon with the help of chatGPT-5.***
 
+# Code 1: Radiocarbon Calibration and Age Conversion
+
+### Overview
+This script performs radiocarbon calibration for sediment cores LPC2 and LPC3 using the `IntCal` package. Individual radiocarbon ages are calibrated using appropriate calibration curves depending on material type, and summary statistics (median, mean, and 95% HPD ranges) are extracted for each sample.
+
+### Workflow
+1. Load radiocarbon dataset and subset by core (LPC2 and LPC3)
+2. Apply material-specific calibration:
+   - IntCal20 for terrestrial samples (Plant/Wood, Peat)
+   - Marine20 with ΔR = 137 ± 20 years for sediment organic carbon
+3. Compute posterior statistics:
+   - Median calibrated age (cal BP)
+   - Mean calibrated age (cal BP)
+   - 95% highest posterior density (HPD) range
+4. Convert calibrated ages to calendar years (CE/BCE)
+5. Export calibrated datasets for each core
+
+### Calibration Approach
+Radiocarbon calibration is performed using `IntCal::calibrate()`.  
+Material-specific calibration curves are applied based on sample type to account for differences in carbon reservoirs. Marine samples include a regional reservoir correction (ΔR).
+
+### Output
+- `CalibratedDataC2_DeltaR137.csv`
+- `CalibratedDataC3_DeltaR137.csv`
+
+Each file contains calibrated ages (cal BP), 95% uncertainty ranges, and calendar year equivalents.
+
+### Visualization
+Calibration plots were generated directly using the `IntCal` plotting function and saved manually to ensure consistency with standard calibration curve presentation.
+
+### Reference
+Reimer, P.J., et al. (2020). The IntCal20 Northern Hemisphere radiocarbon age calibration curve (0–55 cal kBP). *Radiocarbon*, 62, 725–757.
 
 ```{r}
 knitr::opts_chunk$set(echo = TRUE)
@@ -16,29 +48,10 @@ rm(list = ls())
 ```
 
 
-```{r}
-library(IntCal) #For radiocarbon calibration.
-library(rbacon) #For age-modeling.
-library(clam)
-library(coffee)
-library(ggplot2)
-library(ggsci)
-library(RColorBrewer)
-library(plotly)
-library(dplyr)
-library(tibble)
-library(purrr)
-library(ggpubr)
-library(lubridate)
-library(patchwork)
-library(baseline)
-library(EEM)
-library(data.table)
-library(tidyverse)
-library(conflicted)
-library(stringr)
-library(svglite)
-library(ragg)
+```{r Load libraries}
+library(IntCal)   # radiocarbon calibration
+library(dplyr)    # data manipulation
+library(tidyr)    # unnest_wider
 ```
 
 
@@ -46,9 +59,13 @@ library(ragg)
 
 # Functions
 
-## 'CalOne()'
+## function: `CalOne()`
 
 Calibrate a single radiocarbon date and summarize the posterior
+
+Core calibration function:
+Uses IntCal::calibrate() to generate posterior distributions and extracts median, mean, and 95% HPD intervals (cal BP)
+
 
 description:
 Wrapper around `IntCal::calibrate()` that returns **posterior median, posterior mean, and the overall 95% HPD range** (union of HPD segments), all in **calendar years BP (cal BP)**. Works for IntCal20 (terrestrial) and Marine20 (with optional regional reservoir correction ΔR ± σ).
@@ -93,7 +110,7 @@ CalOne(age = 2030, err = 15, cc = 2, reservoir = 137, res.err = 20)
 
 ```{r CalOne function, include= T, echo= T}
 
-# To stop images from being created after calling calibrate()
+# To stop images from being created after calling calibrate(), optional. 
 calibrate_noplot <- function(...){
   grDevices::pdf(NULL)                     # open a null device (no file created)
   on.exit(try(grDevices::dev.off(), silent = TRUE), add = TRUE)
@@ -134,7 +151,39 @@ CalOne <- function(age, err, cc, reservoir = 0, res.err = 0, prob = 0.95){
 
 ```
 
-## Wrapper helper function
+## function: `summarize_row()`
+
+Select calibration curve and perform radiocarbon calibration for a single sample
+
+description:
+Wrapper function that assigns the appropriate radiocarbon calibration curve based on material type and applies `CalOne()` to compute posterior summary statistics (median, mean, and 95% HPD range in cal BP).
+
+@param type Character. Material type of the sample (e.g., "Plant/Wood", "Peat", or "Sediment Organic carbon").
+@param age Numeric. Conventional radiocarbon age (years BP).
+@param err Numeric. 1σ uncertainty of the radiocarbon age.
+@param dR Numeric. Regional marine reservoir correction ΔR (years). Default is 137.
+@param dR_sd Numeric. 1σ uncertainty of ΔR (years). Default is 20.
+
+@return A named list with:
+\describe{
+\item{median}{Posterior median calibrated age (cal BP).}
+\item{mean}{Posterior mean calibrated age (cal BP).}
+\item{hpd95_low}{Lower bound of the 95% HPD range (cal BP).}
+\item{hpd95_high}{Upper bound of the 95% HPD range (cal BP).}
+}
+
+@details
+- Terrestrial samples ("Plant/Wood", "Peat") are calibrated using IntCal20 (`cc = 1`).
+- Sediment organic carbon samples are calibrated using Marine20 (`cc = 2`) with a regional reservoir correction (ΔR ± σ).
+- This function ensures consistent application of calibration curves across the dataset.
+
+@section Dependencies:
+Requires `CalOne()` and `IntCal` package.
+
+@examples
+summarize_row("Plant/Wood", age = 1000, err = 15)
+
+summarize_row("Sediment Organic carbon", age = 2030, err = 15, dR = 137, dR_sd = 20)
 
 ```{r Wrapper, include= T, echo= T}
 # --- Row-wise wrapper to pick the right curve/ΔR ----------------------------
@@ -150,7 +199,36 @@ summarize_row <- function(type, age, err, dR = 137, dR_sd = 20){
 ```
 
 
-## Helper functions for age conversions
+## function: `bp_to_year_ce()` and `fmt_ce_bce()`
+
+Convert calibrated ages (cal BP) to calendar year notation (CE/BCE)
+
+description:
+Helper functions to convert calibrated radiocarbon ages (cal BP) into calendar years expressed as CE (Common Era) or BCE (Before Common Era).
+
+@param bp Numeric. Calibrated age in years before present (cal BP, where present = 1950 CE).
+@param year_ce Numeric. Calendar year in CE format.
+
+@return
+- `bp_to_year_ce()`: Numeric value representing calendar year (CE scale).
+- `fmt_ce_bce()`: Character string formatted as "XXXX CE" or "XXXX BCE".
+
+@details
+- Conversion follows the standard definition:
+  
+  \[
+  \text{Year (CE)} = 1950 - \text{cal BP}
+  \]
+
+- BCE years are adjusted to account for the absence of year zero in the Gregorian calendar.
+
+@section Notes:
+These functions are used to provide human-readable calendar ages for reporting and interpretation.
+
+@examples
+bp_to_year_ce(1000)      # returns 950 CE
+fmt_ce_bce(950)          # returns "950 CE"
+fmt_ce_bce(-500)         # returns "501 BCE"
 
 ```{r helper to convert cal BP → CE/BCE labels}
 # --- helper to convert cal BP → CE/BCE labels ---
@@ -161,43 +239,6 @@ fmt_ce_bce      <- function(year_ce) ifelse(year_ce >= 1,
 
 ```
 
-## Function to save calibration plots
-
-```{r}
-
-# given an IntCal::calibrate() result, build a ggplot
-plot_calibration_pdf <- function(res, title = NULL){
-  dens <- as.data.frame(res[[1]]); names(dens) <- c("calBP","post")
-  dens$post <- pmax(dens$post, 0)
-  # scale to area 1 (optional, for comparable heights)
-  dens$post <- dens$post / max(dens$post, na.rm = TRUE)
-
-  # HPD segments (can be multiple rows)
-  hpd <- as.data.frame(res[[2]])
-  names(hpd)[1:2] <- c("from","to")
-
-  p <- ggplot(dens, aes(x = calBP, y = post)) +
-    geom_area(alpha = 0.25) +
-    geom_segment(data = hpd,
-                 aes(x = from, xend = to, y = 0, yend = 0),
-                 linewidth = 2) +
-    scale_x_reverse() +
-    labs(x = "cal yr BP", y = "Posterior density", title = title) +
-    theme_classic()
-  p
-}
-
-# save both TIFF and SVG with consistent sizes
-save_plot_both <- function(p, file_base, width = 4.0, height = 2.0, dpi = 600){
-  ggplot2::ggsave(paste0(file_base, ".svg"), plot = p,
-                  device = svglite::svglite, width = width, height = height, units = "in")
-  ggplot2::ggsave(paste0(file_base, ".tiff"), plot = p,
-                  device = ragg::agg_tiff, width = width, height = height,
-                  units = "in", dpi = dpi, compression = "lzw")
-}
-
-
-```
 
 
 # Load Sediment Core data.
