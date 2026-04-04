@@ -3,7 +3,7 @@
 ## Overview
 
 
-This repository contains the analytical workflows used for the geochemical, mineralogical, isotopic, and chronological components in support of the manuscript entitled **“Paleoenvironmental Evolution and Geomorphic Controls on Microbialite Distribution in Laguna Providencia, Puerto Rico”**, by **Bryan J. Rodríguez-Colón et al.** The manuscript has been submitted to *Sedimentology* and is also available as a preprint under the same title.
+This repository contains the analytical workflows used for the geochemical, mineralogical, isotopic, and chronological components in support of the manuscript entitled **“Paleoenvironmental Evolution and Geomorphic Controls of a Microbialite-bearing coastal carbonate-evaporite system, Laguna Providencia, Puerto Rico”**, by **Bryan J. Rodríguez-Colón et al.** The manuscript will be submitted to *Sedimentary Geology* and will be also available as a preprint under the same title.
 
 
 
