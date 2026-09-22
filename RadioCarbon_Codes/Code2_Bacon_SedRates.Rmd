@@ -114,7 +114,7 @@ Bacon(
   accept.suggestions = FALSE
 )
 
-## Assuming Hiatus at 53 cm
+## Assuming Hiatus at 53 cm (DO NOT USE)
 
 Bacon(
   core = "LPC3",
@@ -133,7 +133,7 @@ Bacon(
   remember = FALSE
 )
 
-# 2. Stratigraphic boundary at peat-carbonate contact scenario
+# 2. Specifying Stratigraphic boundary at peat-carbonate contact scenario (DO NOT USE)
 Bacon(
   core = "LPC3",
   acc.mean = c(11, 11),
