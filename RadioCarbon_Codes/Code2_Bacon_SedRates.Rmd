@@ -100,13 +100,48 @@ Bacon(
   accept.suggestions = FALSE
 )
 
+# LPC3 Bacon runs
+
+## Assuming continuous run
 Bacon(
-  core = "LPC3",        # new run name (don’t overwrite)
+  core = "LPC3",      
   acc.mean = 11,
   thick = 5,               
   add.bottom = TRUE,
   d.min = 0,
   d.max = 95,
+  suggest = FALSE,
+  accept.suggestions = FALSE
+)
+
+## Assuming Hiatus at 53 cm
+
+Bacon(
+  core = "LPC3",
+  runname = "LPC3_hiatus53_ss20k",
+  acc.mean = c(11, 11),
+  thick = 5,
+  add.bottom = TRUE,
+  d.min = 0,
+  d.max = 95,
+  hiatus.depths = 53,
+  hiatus.max = 2000,
+  ssize = 20000,
+  seed = 60843,
+  suggest = FALSE,
+  accept.suggestions = FALSE,
+  remember = FALSE
+)
+
+# 2. Stratigraphic boundary at peat-carbonate contact scenario
+Bacon(
+  core = "LPC3",
+  acc.mean = c(11, 11),
+  thick = 5,
+  add.bottom = TRUE,
+  d.min = 0,
+  d.max = 95,
+  boundary = 54,
   suggest = FALSE,
   accept.suggestions = FALSE
 )
